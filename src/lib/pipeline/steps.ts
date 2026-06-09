@@ -1,5 +1,18 @@
 import type { StepDefinition } from "@/types";
 
+/**
+ * Step definitions for the Generate and Refine pipelines.
+ *
+ * Each step references an agent by slug (matching a file in agents/).
+ * The prompt_template provides task-specific instructions that get combined
+ * with the agent's full definition at runtime (see agents.ts).
+ *
+ * Placeholders:
+ *   {{input}}    — output from the previous step (or user input for step 0)
+ *   {{context}}  — project context if available
+ *   {{original}} — original user input (useful for later steps that need it)
+ */
+
 export const GENERATE_STEPS: StepDefinition[] = [
   {
     name: "Analyze Input",
@@ -7,20 +20,13 @@ export const GENERATE_STEPS: StepDefinition[] = [
     description:
       "Parse the raw input, identify themes, extract potential features, and flag ambiguities.",
     review_gate: false,
-    prompt_template: `You are a Story Analyst. Analyze the following input and produce a structured analysis:
-
-1. Identify distinct features or functional areas
-2. Extract key user roles/personas
-3. Flag ambiguities or missing context
-4. Suggest a feature decomposition
+    prompt_template: `Perform a Generate-mode analysis on the following input. Produce the "Output: Generate mode (Analysis)" format from your definition.
 
 ## Input
 {{input}}
 
 ## Project Context
-{{context}}
-
-Respond with a structured markdown document.`,
+{{context}}`,
   },
   {
     name: "Decompose Features",
@@ -28,16 +34,10 @@ Respond with a structured markdown document.`,
     description:
       "Break identified features into individual user stories with clear scope.",
     review_gate: true,
-    prompt_template: `You are a Story Decomposer. Given the analysis below, break each feature into well-scoped user stories.
-
-Each story must follow: "As a [role], I want [capability], so that [benefit]"
-
-Stories should be thin vertical slices — end-to-end for a narrow use case.
+    prompt_template: `Given the analysis below, decompose all identified features into well-scoped user stories. Follow your output format exactly.
 
 ## Analysis
-{{input}}
-
-Produce a markdown document with stories grouped by feature.`,
+{{input}}`,
   },
   {
     name: "Draft Acceptance Criteria",
@@ -45,18 +45,10 @@ Produce a markdown document with stories grouped by feature.`,
     description:
       "Write detailed acceptance criteria for each story covering happy path, edge cases, error states, and NFRs.",
     review_gate: true,
-    prompt_template: `You are an Acceptance Criteria Writer. For each user story below, write complete acceptance criteria.
-
-Each story must have:
-- Happy path scenarios (Given/When/Then)
-- At least one edge case
-- At least one error/boundary condition
-- Non-functional requirements where applicable
+    prompt_template: `Write complete acceptance criteria for each user story below. Follow your output format exactly — every story needs at minimum: one happy-path AC, one edge case, one error/boundary condition, and NFRs.
 
 ## Stories
-{{input}}
-
-Output each story with its acceptance criteria in structured markdown.`,
+{{input}}`,
   },
   {
     name: "Generate Test Specs",
@@ -64,19 +56,10 @@ Output each story with its acceptance criteria in structured markdown.`,
     description:
       "Produce BDD/Gherkin test specifications from the acceptance criteria.",
     review_gate: false,
-    prompt_template: `You are a Test Specification Generator. Given the stories and acceptance criteria below, produce test specifications.
-
-Rules:
-- Every AC maps to at least one test
-- Every test maps back to at least one AC
-- Include negative/boundary tests for every happy path
-- Use Gherkin format (Given/When/Then)
-- Specify test data and preconditions
+    prompt_template: `Generate test specifications for the stories and acceptance criteria below. Follow your output format exactly — include coverage matrix, test cases in Gherkin, test data, and preconditions.
 
 ## Stories with Acceptance Criteria
-{{input}}
-
-Output structured test specifications.`,
+{{input}}`,
   },
   {
     name: "Quality Review",
@@ -84,19 +67,10 @@ Output structured test specifications.`,
     description:
       "Score the complete package against the quality rubric. Identify issues and suggest improvements.",
     review_gate: true,
-    prompt_template: `You are a Story Quality Reviewer. Evaluate the complete story package below.
-
-Score each story (0-100) on:
-- Story clarity (20pts): clear role, capability, benefit
-- AC completeness (25pts): happy path, edge cases, error states, NFRs
-- AC testability (20pts): every AC can be verified
-- Test coverage (20pts): tests trace to AC, negative paths covered
-- Architecture alignment (15pts): stories are implementable given context
+    prompt_template: `Perform a quality review of the complete story package below. Score each story against your rubric (80+ to pass). Provide specific, actionable feedback.
 
 ## Complete Package
-{{input}}
-
-For each story: provide score, pass/fail (80+ passes), and specific actionable feedback.`,
+{{input}}`,
   },
 ];
 
@@ -107,18 +81,10 @@ export const REFINE_STEPS: StepDefinition[] = [
     description:
       "Pull stories from Jira or read from local filesystem. Normalize into standard format.",
     review_gate: false,
-    prompt_template: `You are a Story Importer. Read the following stories and normalize them into the standard format.
-
-For each story, extract:
-- Title and description
-- Existing acceptance criteria (if any)
-- Dependencies and links
-- Jira metadata (key, status, assignee) if from Jira
+    prompt_template: `Normalize the following story source data into your standard import format. Preserve all content — do not filter or interpret.
 
 ## Source
-{{input}}
-
-Output normalized stories in structured markdown.`,
+{{input}}`,
   },
   {
     name: "Gap Analysis",
@@ -126,19 +92,10 @@ Output normalized stories in structured markdown.`,
     description:
       "Identify missing context, inconsistencies, weak acceptance criteria, and gaps in the existing stories.",
     review_gate: true,
-    prompt_template: `You are a Story Analyst performing gap analysis on existing stories.
-
-For each story, identify:
-1. Missing or vague acceptance criteria
-2. Unstated assumptions
-3. Missing dependencies
-4. Inconsistencies between stories
-5. Testability gaps
+    prompt_template: `Perform a Refine-mode gap analysis on the following imported stories. Produce the "Output: Refine mode (Gap Analysis)" format from your definition.
 
 ## Stories
-{{input}}
-
-Produce a gap analysis report with severity ratings (HIGH/MEDIUM/LOW).`,
+{{input}}`,
   },
   {
     name: "Rewrite Stories",
@@ -146,22 +103,13 @@ Produce a gap analysis report with severity ratings (HIGH/MEDIUM/LOW).`,
     description:
       "Improve stories and acceptance criteria based on the gap analysis findings.",
     review_gate: true,
-    prompt_template: `You are a Story Rewriter. Given the original stories and gap analysis, produce improved versions.
-
-Rules:
-- Preserve the original intent — don't change scope
-- Address all HIGH and MEDIUM gaps
-- Improve AC to be specific and testable
-- Add missing edge cases and error handling
-- Flag assumptions explicitly
+    prompt_template: `Rewrite the stories below based on the gap analysis. Address all HIGH and MEDIUM gaps. Follow your output format exactly.
 
 ## Original Stories
 {{original}}
 
 ## Gap Analysis
-{{input}}
-
-Output the complete rewritten stories.`,
+{{input}}`,
   },
   {
     name: "Generate Test Specs",
@@ -169,18 +117,10 @@ Output the complete rewritten stories.`,
     description:
       "Produce or update test specifications for the refined stories.",
     review_gate: false,
-    prompt_template: `You are a Test Specification Generator. Given the refined stories below, produce test specifications.
-
-Rules:
-- Every AC maps to at least one test
-- Include negative/boundary tests
-- Use Gherkin format
-- Specify test data and preconditions
+    prompt_template: `Generate test specifications for the refined stories below. Follow your output format exactly.
 
 ## Refined Stories
-{{input}}
-
-Output structured test specifications.`,
+{{input}}`,
   },
   {
     name: "Quality Review",
@@ -188,16 +128,12 @@ Output structured test specifications.`,
     description:
       "Score the refined package. Compare against original to show improvement.",
     review_gate: true,
-    prompt_template: `You are a Story Quality Reviewer. Evaluate the refined story package.
-
-Score each story (0-100) using the standard rubric. Also note improvement vs. the original.
+    prompt_template: `Perform a quality review of the refined story package. Score each story against your rubric (80+ to pass). Compare against the original and highlight improvements.
 
 ## Refined Package
 {{input}}
 
 ## Original (for comparison)
-{{original}}
-
-Provide scores, pass/fail, and specific feedback. Highlight what improved and what still needs work.`,
+{{original}}`,
   },
 ];

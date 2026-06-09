@@ -181,11 +181,18 @@ export async function executePipeline(
     emit(runId, "step_started", step.id, { name: def.name, index: i });
 
     try {
-      // Build prompt from template
-      const prompt = def.prompt_template
+      // Build prompt: agent definition + task instructions + input
+      const { buildAgentPrompt } = await import("./agents");
+      const taskInstructions = def.prompt_template
         .replace("{{input}}", previousOutput)
         .replace("{{context}}", "")
         .replace("{{original}}", run.input);
+
+      const prompt = buildAgentPrompt(
+        def.agent,
+        taskInstructions,
+        previousOutput
+      );
 
       // Store input for this step
       db.prepare("UPDATE pipeline_steps SET input = ? WHERE id = ?").run(
@@ -193,7 +200,7 @@ export async function executePipeline(
         step.id
       );
 
-      // Call Claude API
+      // Call the configured AI provider
       const output = await callAgent(prompt, run);
 
       updateStepStatus(step.id, "completed", output);
@@ -236,28 +243,8 @@ export async function resumeAfterReview(runId: string): Promise<void> {
 
 async function callAgent(
   prompt: string,
-  run: PipelineRun
+  _run: PipelineRun
 ): Promise<string> {
-  const db = getDb();
-  const apiKeyRow = db
-    .prepare("SELECT value FROM config WHERE key = 'anthropic_api_key'")
-    .get() as { value: string } | undefined;
-
-  if (!apiKeyRow?.value) {
-    throw new Error(
-      "Anthropic API key not configured. Go to Settings to add it."
-    );
-  }
-
-  const { default: Anthropic } = await import("@anthropic-ai/sdk");
-  const client = new Anthropic({ apiKey: apiKeyRow.value });
-
-  const message = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 8192,
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  const textBlock = message.content.find((b) => b.type === "text");
-  return textBlock?.text ?? "";
+  const { callProvider } = await import("@/lib/providers");
+  return callProvider(prompt);
 }

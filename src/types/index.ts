@@ -17,13 +17,21 @@ export type RunStatus =
 
 export type RefineSource = "jira" | "local";
 
+export type ProviderType = "subscription" | "api_key" | "bedrock";
+
 export interface Config {
+  provider: ProviderType;
+  anthropic_api_key: string;
+  model: string;
+  aws_region: string;
+  aws_access_key_id: string;
+  aws_secret_access_key: string;
+  bedrock_model_id: string;
   jira_url: string;
   jira_email: string;
   jira_api_key: string;
   jira_project_key: string;
   output_directory: string;
-  anthropic_api_key: string;
 }
 
 export interface PipelineRun {

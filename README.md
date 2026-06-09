@@ -1,36 +1,168 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Story Refinery
 
-## Getting Started
+AI-powered web application for generating and refining user stories with acceptance criteria. Runs a multi-step agent pipeline with human review gates at each stage.
 
-First, run the development server:
+## What it does
+
+**Generate mode** — Describe a feature, product, or idea in plain text. The pipeline runs five agent steps to produce structured user stories with acceptance criteria and test specifications.
+
+**Refine mode** — Import existing stories from Jira or local markdown files. The pipeline analyzes gaps, rewrites stories with improved AC, generates test specs, and scores quality.
+
+Both modes use a visual step-by-step pipeline where you can review and provide feedback after any step before the pipeline continues.
+
+## Prerequisites
+
+- **Node.js 20+** — [nodejs.org](https://nodejs.org)
+- **One of the following AI providers:**
+  - **Claude Subscription** (recommended) — Claude Pro, Team, or Enterprise subscription with [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed
+  - **Anthropic API Key** — from [console.anthropic.com](https://console.anthropic.com)
+  - **AWS Bedrock** — AWS account with Claude models enabled in Bedrock
+
+### Optional
+
+- **Jira Cloud account** — only needed for Refine mode with Jira source. Requires an API token from [id.atlassian.com](https://id.atlassian.com/manage-profile/security/api-tokens)
+
+## Quick Start
 
 ```bash
+# 1. Clone the repo
+git clone https://github.com/denis-wane/story-refinery.git
+cd story-refinery
+
+# 2. Install dependencies
+npm install
+
+# 3. Start the dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) and go to **Settings** to configure your AI provider.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Provider Setup
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Option A: Claude Subscription (simplest)
 
-## Learn More
+If you have a Claude Pro, Team, or Enterprise subscription:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+# Install Claude Code CLI (if not already installed)
+npm install -g @anthropic-ai/claude-code
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Log in to your subscription
+claude login
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+In Story Refinery Settings, select **Claude Subscription** as the provider. That's it — no API key needed.
 
-## Deploy on Vercel
+### Option B: Anthropic API Key
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Get an API key from [console.anthropic.com](https://console.anthropic.com)
+2. In Settings, select **Anthropic API Key** and paste your key
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Option C: AWS Bedrock
+
+1. Enable Claude models in your AWS Bedrock console
+2. In Settings, select **AWS Bedrock** and provide:
+   - AWS Region (e.g., `us-east-1`)
+   - AWS Access Key ID and Secret (or leave blank to use IAM role / environment credentials)
+   - Bedrock Model ID (defaults to `anthropic.claude-sonnet-4-20250514-v1:0`)
+
+## Jira Setup (Optional)
+
+Only needed if you want to use Refine mode with Jira as a source.
+
+1. Go to **Settings > Jira Connection**
+2. Enter your Jira Cloud URL (e.g., `https://your-org.atlassian.net`)
+3. Enter your email and [API token](https://id.atlassian.com/manage-profile/security/api-tokens)
+4. Set your default project key
+5. Click **Test Connection** to verify
+
+Stories imported from Jira use the Jira issue key as the filename (e.g., `PROJ-123.md`).
+
+## Usage
+
+### Generate Stories
+
+1. Go to **Generate**
+2. Describe your feature, product, or idea in the text area
+3. Click **Start Generation Pipeline**
+4. The pipeline runs through 5 steps:
+   - **Analyze Input** — identifies features, personas, ambiguities
+   - **Decompose Features** — breaks into individual user stories *(review gate)*
+   - **Draft AC** — writes acceptance criteria *(review gate)*
+   - **Generate Test Specs** — produces BDD/Gherkin tests
+   - **Quality Review** — scores against rubric *(review gate)*
+5. At each review gate, review the output and either approve or request changes
+
+### Refine Stories
+
+1. Go to **Refine**
+2. Choose a source: **Local Files** (directory path) or **Jira** (issue keys)
+3. Click **Start Refinement Pipeline**
+4. The pipeline runs through 5 steps:
+   - **Import** — normalizes stories from source
+   - **Gap Analysis** — identifies weaknesses *(review gate)*
+   - **Rewrite** — improves stories and AC *(review gate)*
+   - **Generate Test Specs** — creates tests for refined stories
+   - **Quality Review** — scores and compares to original *(review gate)*
+
+## Agent Definitions
+
+Agent definitions live in the `agents/` directory as markdown files. Each agent has a defined role, input/output format, and rules. You can modify these to change how the pipeline behaves:
+
+| Agent | File | Used in |
+|-------|------|---------|
+| Story Analyst | `agents/story-analyst.md` | Generate (analyze), Refine (gap analysis) |
+| Story Decomposer | `agents/story-decomposer.md` | Generate (decompose) |
+| AC Writer | `agents/ac-writer.md` | Generate (draft AC), Refine (rewrite) |
+| Test Generator | `agents/test-generator.md` | Generate + Refine (test specs) |
+| Story Reviewer | `agents/story-reviewer.md` | Generate + Refine (quality review) |
+| Story Importer | `agents/story-importer.md` | Refine (import) |
+| Story Rewriter | `agents/story-rewriter.md` | Refine (rewrite) |
+
+To customize an agent, edit its markdown file. Changes take effect on the next pipeline run — no restart needed.
+
+## Project Structure
+
+```
+story-refinery/
+  agents/                       # Agent definitions (editable markdown)
+  src/
+    app/                        # Next.js pages and API routes
+      api/                      # REST API endpoints
+      generate/                 # Generate mode page
+      refine/                   # Refine mode page
+      runs/                     # Run history and detail pages
+      settings/                 # Configuration page
+    components/                 # React components
+      layout/                   # Navigation, header
+      pipeline/                 # Step timeline, output viewer, review form
+    lib/                        # Core logic
+      db.ts                     # SQLite database
+      providers/                # AI provider abstraction (subscription/API/Bedrock)
+      pipeline/                 # Pipeline engine, step definitions, agent loader
+    types/                      # TypeScript type definitions
+  data/                         # SQLite database (gitignored, created on first run)
+  DESIGN.md                     # Architecture documentation
+```
+
+## Tech Stack
+
+- **Next.js 16** — React framework with API routes
+- **React 19** — UI components
+- **Tailwind CSS 4** — Styling
+- **SQLite** (better-sqlite3) — Local state persistence
+- **Anthropic SDK** — API key and Bedrock providers
+- **Claude Code CLI** — Subscription provider
+
+## Development
+
+```bash
+npm run dev     # Start dev server with hot reload
+npm run build   # Production build
+npm run lint    # Run ESLint
+```
+
+## License
+
+MIT

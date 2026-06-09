@@ -2,13 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 
 const CONFIG_KEYS = [
+  "provider",
+  "anthropic_api_key",
+  "model",
+  "aws_region",
+  "aws_access_key_id",
+  "aws_secret_access_key",
+  "bedrock_model_id",
   "jira_url",
   "jira_email",
   "jira_api_key",
   "jira_project_key",
   "output_directory",
-  "anthropic_api_key",
 ];
+
+const SENSITIVE_KEYS = new Set([
+  "anthropic_api_key",
+  "jira_api_key",
+  "aws_access_key_id",
+  "aws_secret_access_key",
+]);
 
 export async function GET() {
   const db = getDb();
@@ -23,9 +36,9 @@ export async function GET() {
   }
 
   // Mask sensitive values
-  if (config.jira_api_key) config.jira_api_key = "***" + config.jira_api_key.slice(-4);
-  if (config.anthropic_api_key)
-    config.anthropic_api_key = "***" + config.anthropic_api_key.slice(-4);
+  for (const key of SENSITIVE_KEYS) {
+    if (config[key]) config[key] = "***" + config[key].slice(-4);
+  }
 
   return NextResponse.json(config);
 }
