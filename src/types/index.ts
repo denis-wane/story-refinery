@@ -41,6 +41,8 @@ export interface PipelineRun {
   input: string;
   refine_source?: RefineSource;
   refine_path?: string;
+  revision_count: number;
+  max_revisions: number;
   created_at: string;
   updated_at: string;
 }
@@ -78,7 +80,7 @@ export interface StepDefinition {
 }
 
 export interface PipelineEvent {
-  type: "step_started" | "step_progress" | "step_completed" | "step_failed" | "run_completed" | "review_required";
+  type: "step_started" | "step_progress" | "step_completed" | "step_failed" | "run_completed" | "review_required" | "revision_started" | "revision_limit_reached";
   run_id: string;
   step_id?: string;
   data: Record<string, unknown>;

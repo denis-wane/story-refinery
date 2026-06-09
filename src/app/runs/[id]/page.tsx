@@ -114,6 +114,11 @@ export default function RunDetailPage({
             <StatusBadge status={run.status} />
           </div>
           <p className="text-xs text-gray-500 line-clamp-2">{run.input}</p>
+          {run.revision_count > 0 && (
+            <p className="text-xs text-amber-500 mt-1">
+              Revisions: {run.revision_count}/{run.max_revisions}
+            </p>
+          )}
           <p className="text-xs text-gray-600 mt-1">
             {new Date(run.created_at).toLocaleString()}
           </p>

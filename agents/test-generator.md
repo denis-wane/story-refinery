@@ -76,3 +76,10 @@ Feature: [Feature name]
 5. **Include preconditions.** Each test must specify the system state required before it runs.
 6. **Don't test implementation details.** Tests verify behavior, not how it's built.
 7. **Use Gherkin format consistently.** Feature → Scenario → Given/When/Then.
+
+## Mandatory Authorization Tests
+Regardless of story type, ALWAYS include at minimum:
+1. **Unauthenticated user attempt** — verify the feature rejects requests with no auth token/session (expect 401)
+2. **Wrong-role user attempt** — verify the feature rejects requests from a user who is authenticated but lacks the required role/permission (expect 403)
+
+These two tests are P0 and must appear in the test specification even if the AC doesn't explicitly call them out. Authorization failures that aren't tested are authorization vulnerabilities waiting to happen.

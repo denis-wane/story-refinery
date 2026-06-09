@@ -63,6 +63,8 @@ export function createRun(
     input,
     refine_source: refineSource,
     refine_path: refinePath,
+    revision_count: 0,
+    max_revisions: 3,
     created_at: now,
     updated_at: now,
   };
@@ -201,6 +203,15 @@ export async function executePipeline(
     if (steps[i].output) previousOutput = steps[i].output!;
   }
 
+  // During a revision, the target step may have pre-populated input
+  // containing reviewer feedback. Use it if available.
+  if (fromStepIndex > 0 && run.revision_count > 0) {
+    const targetStep = steps[fromStepIndex];
+    if (targetStep.input) {
+      previousOutput = targetStep.input;
+    }
+  }
+
   for (let i = fromStepIndex; i < steps.length; i++) {
     const step = steps[i];
     const def = stepDefs[i];
@@ -243,6 +254,81 @@ export async function executePipeline(
         output_length: output.length,
       });
 
+      // Quality Review revision loop: if the reviewer scores < 80,
+      // automatically route feedback back to the relevant agent(s)
+      // and re-run from that point (up to max_revisions times).
+      if (def.agent === "story-reviewer") {
+        const currentRun = getRun(runId)!;
+        const score = parseReviewScore(output);
+        const verdict = parseReviewVerdict(output);
+
+        if (
+          score !== null &&
+          score < 80 &&
+          verdict !== "PASS" &&
+          currentRun.revision_count < currentRun.max_revisions
+        ) {
+          const newCount = currentRun.revision_count + 1;
+          updateRun(runId, { revision_count: newCount });
+
+          emit(runId, "revision_started", step.id, {
+            score,
+            verdict,
+            revision_number: newCount,
+            max_revisions: currentRun.max_revisions,
+          });
+
+          // Find which step to loop back to based on reviewer feedback
+          const targetIndex = findRevisionTarget(output, stepDefs);
+
+          // Reset steps from targetIndex to current (exclusive) to pending
+          const currentSteps = getSteps(runId);
+          for (let j = targetIndex; j < i; j++) {
+            updateStep(runId, currentSteps[j].id, {
+              status: "pending",
+              output: null,
+              error: null,
+              started_at: null,
+              completed_at: null,
+            });
+          }
+
+          // Inject the reviewer feedback into the input for the target step
+          // so the agent knows what to fix
+          const revisionInput = [
+            previousOutput,
+            "",
+            "## Reviewer Feedback (Revision " + newCount + "/" + currentRun.max_revisions + ")",
+            "The Quality Reviewer scored this package " + score + "/100 (" + verdict + "). Address the following feedback:",
+            "",
+            output,
+          ].join("\n");
+
+          // Update the target step's input with revision context
+          updateStep(runId, currentSteps[targetIndex].id, {
+            input: revisionInput,
+          });
+
+          // Re-run the pipeline from the target step
+          await executePipeline(runId, targetIndex);
+          return;
+        }
+
+        // If score >= 80 or verdict is PASS, or we've hit max revisions, fall through
+        if (
+          score !== null &&
+          score < 80 &&
+          currentRun.revision_count >= currentRun.max_revisions
+        ) {
+          emit(runId, "revision_limit_reached", step.id, {
+            score,
+            revision_count: currentRun.revision_count,
+            max_revisions: currentRun.max_revisions,
+          });
+          // Fall through to review gate (human review)
+        }
+      }
+
       // Check for review gate
       if (def.review_gate) {
         updateStepStatus(runId, step.id, "review_pending");
@@ -280,6 +366,79 @@ export async function resumeAfterReview(runId: string): Promise<void> {
 
   // The reviewed step is already marked completed by addReview
   await executePipeline(runId, reviewedIndex + 1);
+}
+
+/**
+ * Parse the reviewer's score from the Quality Review output.
+ * Looks for patterns like "Score: 72/100" or "TOTAL | **72** | **100**"
+ * Returns the numeric score, or null if unparseable.
+ */
+function parseReviewScore(reviewOutput: string): number | null {
+  // Try "Score: X/100" pattern
+  const scoreMatch = reviewOutput.match(/Score:\s*(\d+)\s*\/\s*100/i);
+  if (scoreMatch) return parseInt(scoreMatch[1], 10);
+
+  // Try table total row: "| **TOTAL** | **100** | **X/100** |"
+  const totalMatch = reviewOutput.match(
+    /TOTAL\D+(\d+)\D+\/\s*100/i
+  );
+  if (totalMatch) return parseInt(totalMatch[1], 10);
+
+  return null;
+}
+
+/**
+ * Parse the reviewer's verdict from the Quality Review output.
+ * Returns "PASS", "NEEDS-REVISION", or "BLOCK".
+ */
+function parseReviewVerdict(reviewOutput: string): string | null {
+  const verdictMatch = reviewOutput.match(
+    /\b(PASS|NEEDS-REVISION|BLOCK)\b/
+  );
+  return verdictMatch ? verdictMatch[1] : null;
+}
+
+/**
+ * Determine which step index to loop back to based on reviewer feedback.
+ * The reviewer includes "Feedback for revision" sections addressed to specific agents.
+ * We find the earliest agent mentioned and route back to that step.
+ */
+function findRevisionTarget(
+  reviewOutput: string,
+  stepDefs: StepDefinition[]
+): number {
+  const lowerOutput = reviewOutput.toLowerCase();
+
+  // Map agent feedback mentions to their step indices
+  const agentMentions: { agent: string; index: number; position: number }[] = [];
+
+  for (let i = 0; i < stepDefs.length; i++) {
+    const def = stepDefs[i];
+    // Check for "To Story Analyst:", "To AC Writer:", etc.
+    const mentionPatterns = [
+      `to ${def.agent.replace(/-/g, " ")}`,
+      `to ${def.name.toLowerCase()}`,
+      `feedback for ${def.agent.replace(/-/g, " ")}`,
+    ];
+
+    for (const pattern of mentionPatterns) {
+      const pos = lowerOutput.indexOf(pattern);
+      if (pos !== -1) {
+        agentMentions.push({ agent: def.agent, index: i, position: pos });
+        break;
+      }
+    }
+  }
+
+  if (agentMentions.length > 0) {
+    // Return the earliest step that needs revision
+    agentMentions.sort((a, b) => a.index - b.index);
+    return agentMentions[0].index;
+  }
+
+  // Default: go back to the step before Quality Review (the last content-producing step)
+  const reviewIndex = stepDefs.findIndex((d) => d.agent === "story-reviewer");
+  return Math.max(0, reviewIndex - 2);
 }
 
 async function callAgent(
