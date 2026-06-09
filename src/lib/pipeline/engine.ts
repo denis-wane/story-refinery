@@ -1,6 +1,7 @@
 import { v4 as uuid } from "uuid";
 import { getDb } from "@/lib/db";
 import { GENERATE_STEPS, REFINE_STEPS } from "./steps";
+import { writeStepOutput, writeRunSummary } from "@/lib/files";
 import type {
   PipelineMode,
   PipelineRun,
@@ -206,6 +207,13 @@ export async function executePipeline(
       updateStepStatus(step.id, "completed", output);
       previousOutput = output;
 
+      // Write step output to filesystem
+      try {
+        writeStepOutput(runId, def.name, def.agent, output, run.mode, i);
+      } catch {
+        // File output is best-effort — don't fail the pipeline
+      }
+
       emit(runId, "step_completed", step.id, {
         name: def.name,
         output_length: output.length,
@@ -228,6 +236,15 @@ export async function executePipeline(
   }
 
   updateRunStatus(runId, "completed");
+
+  // Write run summary to filesystem
+  try {
+    const finalSteps = getSteps(runId);
+    writeRunSummary(runId, run.mode, run.input, finalSteps);
+  } catch {
+    // File output is best-effort
+  }
+
   emit(runId, "run_completed", undefined, {});
 }
 

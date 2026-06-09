@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, use } from "react";
 import StepTimeline from "@/components/pipeline/step-timeline";
 import OutputViewer from "@/components/pipeline/output-viewer";
 import ReviewForm from "@/components/pipeline/review-form";
+import FileBrowser from "@/components/pipeline/file-browser";
 import type { PipelineRun, PipelineStep, Review } from "@/types";
 
 interface RunData {
@@ -125,11 +126,13 @@ export default function RunDetailPage({
           onSelectStep={setActiveStepId}
           onAddReview={setReviewStepId}
         />
+
+        <FileBrowser runId={id} runStatus={run.status} />
       </div>
 
       {/* Right panel: Output viewer */}
       <div className="flex-1 bg-gray-950">
-        <OutputViewer step={activeStep} reviews={activeReviews} />
+        <OutputViewer step={activeStep} reviews={activeReviews} runId={run.id} onRerunComplete={fetchData} />
       </div>
 
       {/* Review modal */}

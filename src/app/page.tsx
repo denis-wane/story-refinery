@@ -1,6 +1,35 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
+interface RecentRun {
+  id: string;
+  mode: string;
+  status: string;
+  input: string;
+  created_at: string;
+}
+
+interface Stats {
+  total_runs: number;
+  generate_runs: number;
+  refine_runs: number;
+  completed_runs: number;
+  active_runs: number;
+  recent_runs: RecentRun[];
+}
+
 export default function Dashboard() {
+  const [stats, setStats] = useState<Stats | null>(null);
+
+  useEffect(() => {
+    fetch("/api/stats")
+      .then((res) => res.json())
+      .then(setStats)
+      .catch(console.error);
+  }, []);
+
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <div className="mb-10">
@@ -94,18 +123,69 @@ export default function Dashboard() {
       {/* Quick Stats */}
       <div className="mt-10 grid grid-cols-3 gap-4">
         <div className="p-4 rounded-lg bg-gray-900 border border-gray-800">
-          <p className="text-2xl font-bold text-gray-100">--</p>
+          <p className="text-2xl font-bold text-gray-100">{stats ? stats.total_runs : 0}</p>
           <p className="text-xs text-gray-500 mt-1">Total Runs</p>
         </div>
         <div className="p-4 rounded-lg bg-gray-900 border border-gray-800">
-          <p className="text-2xl font-bold text-gray-100">--</p>
+          <p className="text-2xl font-bold text-gray-100">{stats ? stats.generate_runs : 0}</p>
           <p className="text-xs text-gray-500 mt-1">Stories Generated</p>
         </div>
         <div className="p-4 rounded-lg bg-gray-900 border border-gray-800">
-          <p className="text-2xl font-bold text-gray-100">--</p>
+          <p className="text-2xl font-bold text-gray-100">{stats ? stats.refine_runs : 0}</p>
           <p className="text-xs text-gray-500 mt-1">Stories Refined</p>
         </div>
       </div>
+
+      {/* Recent Runs */}
+      {stats && stats.recent_runs.length > 0 && (
+        <div className="mt-8">
+          <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-3">
+            Recent Runs
+          </h3>
+          <div className="space-y-2">
+            {stats.recent_runs.map((run) => (
+              <Link
+                key={run.id}
+                href={`/runs/${run.id}`}
+                className="flex items-center gap-3 p-3 rounded-lg bg-gray-900 border border-gray-800 hover:border-gray-700 transition-colors"
+              >
+                <span
+                  className={`text-xs font-medium px-2 py-0.5 rounded ${
+                    run.mode === "generate"
+                      ? "bg-blue-900/30 text-blue-400"
+                      : "bg-emerald-900/30 text-emerald-400"
+                  }`}
+                >
+                  {run.mode}
+                </span>
+                <StatusBadge status={run.status} />
+                <span className="text-sm text-gray-300 truncate flex-1">
+                  {run.input.length > 80 ? run.input.slice(0, 80) + "..." : run.input}
+                </span>
+                <span className="text-xs text-gray-600 flex-shrink-0">
+                  {new Date(run.created_at).toLocaleString()}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    pending: "bg-gray-700 text-gray-300",
+    running: "bg-blue-800/50 text-blue-300",
+    paused: "bg-amber-800/50 text-amber-300",
+    completed: "bg-green-800/50 text-green-300",
+    failed: "bg-red-800/50 text-red-300",
+  };
+
+  return (
+    <span className={`text-xs font-medium px-2 py-0.5 rounded ${styles[status] || ""}`}>
+      {status}
+    </span>
   );
 }

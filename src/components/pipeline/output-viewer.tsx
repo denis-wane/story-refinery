@@ -1,13 +1,36 @@
 "use client";
 
+import { useState } from "react";
 import type { PipelineStep, Review } from "@/types";
 
 interface OutputViewerProps {
   step: PipelineStep | null;
   reviews: Review[];
+  runId?: string;
+  onRerunComplete?: () => void;
 }
 
-export default function OutputViewer({ step, reviews }: OutputViewerProps) {
+export default function OutputViewer({ step, reviews, runId, onRerunComplete }: OutputViewerProps) {
+  const [rerunning, setRerunning] = useState(false);
+
+  const canRerun = step && runId && (step.status === "completed" || step.status === "failed");
+
+  async function handleRerun() {
+    if (!step || !runId) return;
+    setRerunning(true);
+    try {
+      const res = await fetch(`/api/pipeline/${runId}/steps/${step.id}/rerun`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        onRerunComplete?.();
+      }
+    } catch (err) {
+      console.error("Re-run failed:", err);
+    } finally {
+      setRerunning(false);
+    }
+  }
   if (!step) {
     return (
       <div className="flex items-center justify-center h-full text-gray-500 text-sm">
@@ -21,7 +44,30 @@ export default function OutputViewer({ step, reviews }: OutputViewerProps) {
       <div className="p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-200">{step.name}</h2>
-          <StatusBadge status={step.status} />
+          <div className="flex items-center gap-2">
+            {canRerun && (
+              <button
+                onClick={handleRerun}
+                disabled={rerunning}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {rerunning ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                    Re-running...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Re-run from here
+                  </>
+                )}
+              </button>
+            )}
+            <StatusBadge status={step.status} />
+          </div>
         </div>
 
         {step.error && (

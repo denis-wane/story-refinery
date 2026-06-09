@@ -11,22 +11,65 @@ export default function RefinePage() {
   const [jiraKeys, setJiraKeys] = useState("");
   const [localPath, setLocalPath] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [statusMsg, setStatusMsg] = useState("");
+  const [error, setError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (submitting) return;
 
-    const input = source === "jira" ? jiraKeys.trim() : localPath.trim();
-    if (!input) return;
+    const rawInput = source === "jira" ? jiraKeys.trim() : localPath.trim();
+    if (!rawInput) return;
 
     setSubmitting(true);
+    setError("");
+    setStatusMsg("");
+
     try {
+      let pipelineInput = rawInput;
+
+      // For Jira source: fetch stories from Jira first, then feed formatted markdown to the pipeline
+      if (source === "jira") {
+        setStatusMsg("Fetching stories from Jira...");
+        const keys = rawInput
+          .split(/[\n,]+/)
+          .map((k) => k.trim())
+          .filter(Boolean);
+
+        const jiraRes = await fetch("/api/jira/stories", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keys }),
+        });
+
+        const jiraData = await jiraRes.json();
+
+        if (!jiraRes.ok) {
+          setError(jiraData.error || "Failed to fetch stories from Jira");
+          return;
+        }
+
+        if (jiraData.count === 0) {
+          setError("No stories were found for the provided keys");
+          return;
+        }
+
+        setStatusMsg(`Fetched ${jiraData.count} stories. Starting pipeline...`);
+        pipelineInput = jiraData.stories;
+
+        if (jiraData.errors?.length) {
+          setStatusMsg(
+            `Fetched ${jiraData.count} stories (${jiraData.errors.length} failed). Starting pipeline...`
+          );
+        }
+      }
+
       const res = await fetch("/api/pipeline/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode: "refine",
-          input,
+          input: pipelineInput,
           refine_source: source,
           refine_path: source === "local" ? localPath.trim() : undefined,
         }),
@@ -35,9 +78,16 @@ export default function RefinePage() {
       if (res.ok) {
         const run = await res.json();
         router.push(`/runs/${run.id}`);
+      } else {
+        const data = await res.json().catch(() => null);
+        setError(data?.error || `Pipeline failed to start (HTTP ${res.status})`);
       }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
     } finally {
       setSubmitting(false);
+      setStatusMsg("");
     }
   }
 
@@ -171,6 +221,31 @@ PROJ-125"
             </div>
           </div>
 
+          {/* Error message */}
+          {error && (
+            <div className="bg-red-900/30 border border-red-700 rounded-lg p-4">
+              <div className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-red-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-sm text-red-300">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Status message */}
+          {statusMsg && !error && (
+            <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <p className="text-sm text-blue-300">{statusMsg}</p>
+              </div>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={
@@ -179,7 +254,9 @@ PROJ-125"
             }
             className="w-full py-3 px-4 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {submitting ? "Starting pipeline..." : "Start Refinement Pipeline"}
+            {submitting
+              ? statusMsg || "Starting pipeline..."
+              : "Start Refinement Pipeline"}
           </button>
         </div>
       </form>
