@@ -33,7 +33,7 @@ Reads existing features/stories from Jira or the local filesystem and runs them 
 ### Tech Stack
 - **Framework:** Next.js 16 (App Router)
 - **Styling:** Tailwind CSS 4
-- **Database:** SQLite (via better-sqlite3) for local state
+- **Storage:** JSON files on local filesystem (under `data/`)
 - **Agent Runtime:** Claude API via Anthropic SDK
 - **Real-time:** Server-Sent Events for pipeline progress
 
@@ -71,7 +71,7 @@ src/
         test/route.ts           — Test Jira connection
         stories/route.ts        — Fetch stories from Jira
   lib/
-    db.ts                       — SQLite connection + schema
+    store.ts                    — Filesystem-backed JSON storage
     pipeline/
       engine.ts                 — Pipeline execution engine
       steps.ts                  — Step definitions (generate + refine)
@@ -120,4 +120,4 @@ The engine is step-based and event-driven:
 2. Steps emit events (started, progress, completed, failed) via SSE
 3. Between any two steps, the engine checks for a "review gate" — if enabled, it pauses and waits for human review
 4. Steps can be re-run individually, feeding their output forward through remaining steps
-5. The full pipeline state is persisted to SQLite so runs survive server restarts
+5. The full pipeline state is persisted to JSON files (under `data/`) so runs survive server restarts

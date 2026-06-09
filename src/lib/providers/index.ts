@@ -1,4 +1,4 @@
-import { getDb } from "@/lib/db";
+import { getConfigValue } from "@/lib/store";
 
 export type ProviderType = "subscription" | "api_key" | "bedrock";
 
@@ -16,13 +16,7 @@ export interface ProviderConfig {
 }
 
 export function getProviderConfig(): ProviderConfig {
-  const db = getDb();
-  const get = (key: string): string => {
-    const row = db.prepare("SELECT value FROM config WHERE key = ?").get(key) as
-      | { value: string }
-      | undefined;
-    return row?.value ?? "";
-  };
+  const get = (key: string): string => getConfigValue(key) ?? "";
 
   return {
     provider: (get("provider") || "subscription") as ProviderType,

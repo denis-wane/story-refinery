@@ -1,4 +1,4 @@
-import { getDb } from "@/lib/db";
+import { getConfigValue } from "@/lib/store";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -40,19 +40,11 @@ interface JiraLink {
 // ── Config ─────────────────────────────────────────────────────────────
 
 export function getJiraConfig(): JiraConfig {
-  const db = getDb();
-  const get = (key: string): string => {
-    const row = db.prepare("SELECT value FROM config WHERE key = ?").get(key) as
-      | { value: string }
-      | undefined;
-    return row?.value ?? "";
-  };
-
   return {
-    url: get("jira_url").replace(/\/$/, ""),
-    email: get("jira_email"),
-    apiKey: get("jira_api_key"),
-    projectKey: get("jira_project_key"),
+    url: (getConfigValue("jira_url") ?? "").replace(/\/$/, ""),
+    email: getConfigValue("jira_email") ?? "",
+    apiKey: getConfigValue("jira_api_key") ?? "",
+    projectKey: getConfigValue("jira_project_key") ?? "",
   };
 }
 

@@ -1,5 +1,15 @@
 import { v4 as uuid } from "uuid";
-import { getDb } from "@/lib/db";
+import {
+  getRun as storeGetRun,
+  saveRun,
+  updateRun,
+  listRuns as storeListRuns,
+  getSteps as storeGetSteps,
+  saveSteps,
+  updateStep,
+  getReviewsForStep,
+  addReview as storeAddReview,
+} from "@/lib/store";
 import { GENERATE_STEPS, REFINE_STEPS } from "./steps";
 import { writeStepOutput, writeRunSummary } from "@/lib/files";
 import type {
@@ -43,59 +53,78 @@ export function createRun(
   refineSource?: RefineSource,
   refinePath?: string
 ): PipelineRun {
-  const db = getDb();
   const id = uuid();
   const now = new Date().toISOString();
 
-  db.prepare(
-    `INSERT INTO pipeline_runs (id, mode, status, input, refine_source, refine_path, created_at, updated_at)
-     VALUES (?, ?, 'pending', ?, ?, ?, ?, ?)`
-  ).run(id, mode, input, refineSource ?? null, refinePath ?? null, now, now);
+  const run: PipelineRun = {
+    id,
+    mode,
+    status: "pending",
+    input,
+    refine_source: refineSource,
+    refine_path: refinePath,
+    created_at: now,
+    updated_at: now,
+  };
+  saveRun(run);
 
-  const steps: StepDefinition[] =
+  const stepDefs: StepDefinition[] =
     mode === "generate" ? GENERATE_STEPS : REFINE_STEPS;
 
-  const insertStep = db.prepare(
-    `INSERT INTO pipeline_steps (id, run_id, name, agent, order_index, status, review_gate)
-     VALUES (?, ?, ?, ?, ?, 'pending', ?)`
-  );
-
-  for (let i = 0; i < steps.length; i++) {
-    insertStep.run(uuid(), id, steps[i].name, steps[i].agent, i, steps[i].review_gate ? 1 : 0);
-  }
+  const steps: PipelineStep[] = stepDefs.map((def, i) => ({
+    id: uuid(),
+    run_id: id,
+    name: def.name,
+    agent: def.agent,
+    order_index: i,
+    status: "pending",
+    input: null,
+    output: null,
+    error: null,
+    review_gate: def.review_gate,
+    started_at: null,
+    completed_at: null,
+  }));
+  saveSteps(id, steps);
 
   return getRun(id)!;
 }
 
 export function getRun(id: string): PipelineRun | null {
-  const db = getDb();
-  return db.prepare("SELECT * FROM pipeline_runs WHERE id = ?").get(id) as PipelineRun | null;
+  return storeGetRun(id);
 }
 
 export function listRuns(): PipelineRun[] {
-  const db = getDb();
-  return db
-    .prepare("SELECT * FROM pipeline_runs ORDER BY created_at DESC")
-    .all() as PipelineRun[];
+  return storeListRuns();
 }
 
 export function getSteps(runId: string): PipelineStep[] {
-  const db = getDb();
-  return db
-    .prepare("SELECT * FROM pipeline_steps WHERE run_id = ? ORDER BY order_index")
-    .all(runId) as PipelineStep[];
+  return storeGetSteps(runId);
 }
 
 export function getStep(stepId: string): PipelineStep | null {
-  const db = getDb();
-  return db.prepare("SELECT * FROM pipeline_steps WHERE id = ?").get(stepId) as PipelineStep | null;
+  // We need to find the step across runs — check all runs
+  // In practice this is only called from contexts where we have the runId nearby,
+  // but for backward compat we scan.
+  const runs = storeListRuns();
+  for (const run of runs) {
+    const steps = storeGetSteps(run.id);
+    const step = steps.find((s) => s.id === stepId);
+    if (step) return step;
+  }
+  return null;
 }
 
 export function getReviews(stepId: string): Review[] {
-  const db = getDb();
-  return db
-    .prepare("SELECT * FROM reviews WHERE step_id = ? ORDER BY created_at DESC")
-    .all(stepId) as Review[];
+  // Find the run that contains this step
+  const runs = storeListRuns();
+  for (const run of runs) {
+    const steps = storeGetSteps(run.id);
+    if (steps.some((s) => s.id === stepId)) {
+      return getReviewsForStep(run.id, stepId);
+    }
+  }
+  return [];
 }
 
 export function addReview(
@@ -104,53 +133,52 @@ export function addReview(
   comments: string,
   approved: boolean
 ): Review {
-  const db = getDb();
   const id = uuid();
+  const now = new Date().toISOString();
 
-  db.prepare(
-    `INSERT INTO reviews (id, step_id, run_id, comments, approved, created_at)
-     VALUES (?, ?, ?, ?, ?, datetime('now'))`
-  ).run(id, stepId, runId, comments, approved ? 1 : 0);
+  const review: Review = {
+    id,
+    step_id: stepId,
+    run_id: runId,
+    comments,
+    approved,
+    created_at: now,
+  };
+  storeAddReview(runId, review);
 
   if (approved) {
-    db.prepare("UPDATE pipeline_steps SET status = 'completed' WHERE id = ?").run(stepId);
-    db.prepare(
-      "UPDATE pipeline_runs SET status = 'running', updated_at = datetime('now') WHERE id = ?"
-    ).run(runId);
+    updateStep(runId, stepId, { status: "completed" });
+    updateRun(runId, { status: "running" });
     emit(runId, "review_approved", stepId, { approved: true });
   }
 
-  return db.prepare("SELECT * FROM reviews WHERE id = ?").get(id) as Review;
+  return review;
 }
 
 export function updateStepStatus(
+  runId: string,
   stepId: string,
   status: string,
   output?: string,
   error?: string
 ) {
-  const db = getDb();
   const now = new Date().toISOString();
   if (status === "running") {
-    db.prepare("UPDATE pipeline_steps SET status = ?, started_at = ? WHERE id = ?").run(
-      status,
-      now,
-      stepId
-    );
+    updateStep(runId, stepId, { status: "running", started_at: now });
   } else if (status === "completed" || status === "failed") {
-    db.prepare(
-      "UPDATE pipeline_steps SET status = ?, output = ?, error = ?, completed_at = ? WHERE id = ?"
-    ).run(status, output ?? null, error ?? null, now, stepId);
+    updateStep(runId, stepId, {
+      status: status as "completed" | "failed",
+      output: output ?? null,
+      error: error ?? null,
+      completed_at: now,
+    });
   } else {
-    db.prepare("UPDATE pipeline_steps SET status = ? WHERE id = ?").run(status, stepId);
+    updateStep(runId, stepId, { status: status as PipelineStep["status"] });
   }
 }
 
 export function updateRunStatus(runId: string, status: string) {
-  const db = getDb();
-  db.prepare(
-    "UPDATE pipeline_runs SET status = ?, updated_at = datetime('now') WHERE id = ?"
-  ).run(status, runId);
+  updateRun(runId, { status: status as PipelineRun["status"] });
 }
 
 // Execute pipeline from a given step index
@@ -158,7 +186,6 @@ export async function executePipeline(
   runId: string,
   fromStepIndex = 0
 ): Promise<void> {
-  const db = getDb();
   const run = getRun(runId);
   if (!run) throw new Error(`Run ${runId} not found`);
 
@@ -178,7 +205,7 @@ export async function executePipeline(
     const step = steps[i];
     const def = stepDefs[i];
 
-    updateStepStatus(step.id, "running");
+    updateStepStatus(runId, step.id, "running");
     emit(runId, "step_started", step.id, { name: def.name, index: i });
 
     try {
@@ -196,15 +223,12 @@ export async function executePipeline(
       );
 
       // Store input for this step
-      db.prepare("UPDATE pipeline_steps SET input = ? WHERE id = ?").run(
-        previousOutput,
-        step.id
-      );
+      updateStep(runId, step.id, { input: previousOutput });
 
       // Call the configured AI provider
       const output = await callAgent(prompt, run);
 
-      updateStepStatus(step.id, "completed", output);
+      updateStepStatus(runId, step.id, "completed", output);
       previousOutput = output;
 
       // Write step output to filesystem
@@ -221,14 +245,14 @@ export async function executePipeline(
 
       // Check for review gate
       if (def.review_gate) {
-        updateStepStatus(step.id, "review_pending");
+        updateStepStatus(runId, step.id, "review_pending");
         updateRunStatus(runId, "paused");
         emit(runId, "review_required", step.id, { name: def.name });
         return; // Pause execution until review is submitted
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      updateStepStatus(step.id, "failed", undefined, message);
+      updateStepStatus(runId, step.id, "failed", undefined, message);
       updateRunStatus(runId, "failed");
       emit(runId, "step_failed", step.id, { name: def.name, error: message });
       return;

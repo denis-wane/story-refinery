@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
 import { getRun, getSteps, executePipeline } from "@/lib/pipeline/engine";
+import { updateStep, updateRun } from "@/lib/store";
 
 export async function POST(
   _request: NextRequest,
@@ -20,19 +20,19 @@ export async function POST(
     return NextResponse.json({ error: "Step not found" }, { status: 404 });
   }
 
-  const db = getDb();
-
   // Reset target step and all subsequent steps
   for (let i = stepIndex; i < steps.length; i++) {
-    db.prepare(
-      "UPDATE pipeline_steps SET status = 'pending', output = NULL, error = NULL, started_at = NULL, completed_at = NULL WHERE id = ?"
-    ).run(steps[i].id);
+    updateStep(runId, steps[i].id, {
+      status: "pending",
+      output: null,
+      error: null,
+      started_at: null,
+      completed_at: null,
+    });
   }
 
   // Update run status
-  db.prepare(
-    "UPDATE pipeline_runs SET status = 'running', updated_at = datetime('now') WHERE id = ?"
-  ).run(runId);
+  updateRun(runId, { status: "running" });
 
   // Fire and forget - execute pipeline from the target step
   executePipeline(runId, stepIndex).catch((err) => {

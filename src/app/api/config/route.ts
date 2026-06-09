@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getConfig, setConfig } from "@/lib/store";
 
 const CONFIG_KEYS = [
   "provider",
@@ -24,15 +24,11 @@ const SENSITIVE_KEYS = new Set([
 ]);
 
 export async function GET() {
-  const db = getDb();
-  const rows = db
-    .prepare("SELECT key, value FROM config WHERE key IN (" + CONFIG_KEYS.map(() => "?").join(",") + ")")
-    .all(...CONFIG_KEYS) as { key: string; value: string }[];
-
+  const stored = getConfig() as Record<string, string>;
   const config: Record<string, string> = {};
+
   for (const key of CONFIG_KEYS) {
-    const row = rows.find((r) => r.key === key);
-    config[key] = row?.value ?? "";
+    config[key] = stored[key] ?? "";
   }
 
   // Mask sensitive values
@@ -45,24 +41,16 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   const body = await request.json();
-  const db = getDb();
+  const updates: Record<string, string> = {};
 
-  const upsert = db.prepare(
-    `INSERT INTO config (key, value, updated_at) VALUES (?, ?, datetime('now'))
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
-  );
-
-  const tx = db.transaction(() => {
-    for (const key of CONFIG_KEYS) {
-      if (key in body && body[key] !== undefined) {
-        // Don't overwrite with masked values
-        if (typeof body[key] === "string" && body[key].startsWith("***")) continue;
-        upsert.run(key, body[key]);
-      }
+  for (const key of CONFIG_KEYS) {
+    if (key in body && body[key] !== undefined) {
+      // Don't overwrite with masked values
+      if (typeof body[key] === "string" && body[key].startsWith("***")) continue;
+      updates[key] = body[key];
     }
-  });
+  }
 
-  tx();
-
+  setConfig(updates);
   return NextResponse.json({ ok: true });
 }

@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { getDb } from "@/lib/db";
+import { getConfigValue } from "@/lib/store";
 import type { PipelineMode, PipelineStep } from "@/types";
 
 function slugify(name: string): string {
@@ -11,11 +11,7 @@ function slugify(name: string): string {
 }
 
 function getOutputDirectory(): string | null {
-  const db = getDb();
-  const row = db
-    .prepare("SELECT value FROM config WHERE key = ?")
-    .get("output_directory") as { value: string } | undefined;
-  return row?.value || null;
+  return getConfigValue("output_directory") || null;
 }
 
 export function getRunOutputDir(runId: string): string | null {

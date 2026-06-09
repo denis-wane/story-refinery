@@ -138,11 +138,11 @@ story-refinery/
       layout/                   # Navigation, header
       pipeline/                 # Step timeline, output viewer, review form
     lib/                        # Core logic
-      db.ts                     # SQLite database
+      store.ts                  # Filesystem-backed JSON storage
       providers/                # AI provider abstraction (subscription/API/Bedrock)
       pipeline/                 # Pipeline engine, step definitions, agent loader
     types/                      # TypeScript type definitions
-  data/                         # SQLite database (gitignored, created on first run)
+  data/                         # JSON data store (gitignored, created on first run)
   DESIGN.md                     # Architecture documentation
 ```
 
@@ -151,7 +151,7 @@ story-refinery/
 - **Next.js 16** — React framework with API routes
 - **React 19** — UI components
 - **Tailwind CSS 4** — Styling
-- **SQLite** (better-sqlite3) — Local state persistence
+- **JSON file storage** — Local state persistence (no native dependencies)
 - **Anthropic SDK** — API key and Bedrock providers
 - **Claude Code CLI** — Subscription provider
 

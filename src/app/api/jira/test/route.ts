@@ -1,19 +1,10 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getConfigValue } from "@/lib/store";
 
 export async function POST() {
-  const db = getDb();
-
-  const getConfig = (key: string) => {
-    const row = db.prepare("SELECT value FROM config WHERE key = ?").get(key) as
-      | { value: string }
-      | undefined;
-    return row?.value ?? "";
-  };
-
-  const url = getConfig("jira_url");
-  const email = getConfig("jira_email");
-  const apiKey = getConfig("jira_api_key");
+  const url = getConfigValue("jira_url") ?? "";
+  const email = getConfigValue("jira_email") ?? "";
+  const apiKey = getConfigValue("jira_api_key") ?? "";
 
   if (!url || !email || !apiKey) {
     return NextResponse.json(
