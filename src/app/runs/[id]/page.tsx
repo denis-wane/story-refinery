@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, use } from "react";
 import StepTimeline from "@/components/pipeline/step-timeline";
 import OutputViewer from "@/components/pipeline/output-viewer";
 import ReviewForm from "@/components/pipeline/review-form";
+import ClarifyQA from "@/components/pipeline/clarify-qa";
 import FileBrowser from "@/components/pipeline/file-browser";
 import type { PipelineRun, PipelineStep, Review } from "@/types";
 
@@ -62,6 +63,10 @@ export default function RunDetailPage({
       // Auto-navigate to the active step
       if (parsed.step_id) {
         setActiveStepId(parsed.step_id);
+      }
+      // Auto-open Q&A for clarify step when review is required
+      if (parsed.type === "review_required" && parsed.step_id) {
+        setReviewStepId(parsed.step_id);
       }
     };
 
@@ -140,8 +145,19 @@ export default function RunDetailPage({
         <OutputViewer step={activeStep} reviews={activeReviews} runId={run.id} onRerunComplete={fetchData} />
       </div>
 
-      {/* Review modal */}
-      {reviewStep && (
+      {/* Review modal — use structured Q&A for Clarify step */}
+      {reviewStep && reviewStep.agent === "clarifier" && reviewStep.output ? (
+        <ClarifyQA
+          clarifierOutput={reviewStep.output}
+          stepId={reviewStep.id}
+          runId={run.id}
+          onSubmit={() => {
+            setReviewStepId(null);
+            fetchData();
+          }}
+          onCancel={() => setReviewStepId(null)}
+        />
+      ) : reviewStep ? (
         <ReviewForm
           stepId={reviewStep.id}
           runId={run.id}
@@ -152,7 +168,7 @@ export default function RunDetailPage({
           }}
           onCancel={() => setReviewStepId(null)}
         />
-      )}
+      ) : null}
     </div>
   );
 }

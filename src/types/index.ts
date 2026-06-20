@@ -47,6 +47,12 @@ export interface PipelineRun {
   updated_at: string;
 }
 
+export interface StepRevision {
+  revision: number;
+  output: string;
+  completed_at: string;
+}
+
 export interface PipelineStep {
   id: string;
   run_id: string;
@@ -60,6 +66,7 @@ export interface PipelineStep {
   review_gate: boolean;
   started_at: string | null;
   completed_at: string | null;
+  previous_outputs?: StepRevision[];
 }
 
 export interface Review {

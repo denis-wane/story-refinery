@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import type { PipelineStep, Review } from "@/types";
+import DiffViewer from "./diff-viewer";
+import InlineFeedback from "./inline-feedback";
 
 interface OutputViewerProps {
   step: PipelineStep | null;
@@ -12,6 +14,8 @@ interface OutputViewerProps {
 
 export default function OutputViewer({ step, reviews, runId, onRerunComplete }: OutputViewerProps) {
   const [rerunning, setRerunning] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
+  const [inlineFeedbackMode, setInlineFeedbackMode] = useState(false);
 
   const canRerun = step && runId && (step.status === "completed" || step.status === "failed");
 
@@ -78,14 +82,71 @@ export default function OutputViewer({ step, reviews, runId, onRerunComplete }: 
 
         {step.output && (
           <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-2">
-              Output
-            </h3>
-            <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
-              <pre className="whitespace-pre-wrap text-sm text-gray-300 font-mono leading-relaxed">
-                {step.output}
-              </pre>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">
+                Output
+              </h3>
+              <div className="flex items-center gap-2">
+                {step.previous_outputs && step.previous_outputs.length > 0 && (
+                  <button
+                    onClick={() => setShowDiff(!showDiff)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      showDiff
+                        ? "bg-purple-600/30 text-purple-300"
+                        : "bg-gray-700/50 text-gray-400 hover:text-gray-300"
+                    }`}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                    {showDiff ? "Hide diff" : "Show diff"}
+                    <span className="text-xs text-gray-500 ml-1">
+                      ({step.previous_outputs.length} revision{step.previous_outputs.length !== 1 ? "s" : ""})
+                    </span>
+                  </button>
+                )}
+                {step.review_gate && (step.status === "completed" || step.status === "review_pending") && (
+                  <button
+                    onClick={() => setInlineFeedbackMode(!inlineFeedbackMode)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      inlineFeedbackMode
+                        ? "bg-blue-600/30 text-blue-300"
+                        : "bg-gray-700/50 text-gray-400 hover:text-gray-300"
+                    }`}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                    </svg>
+                    {inlineFeedbackMode ? "Raw view" : "Inline feedback"}
+                  </button>
+                )}
+              </div>
             </div>
+
+            {showDiff && step.previous_outputs && step.previous_outputs.length > 0 && (
+              <DiffViewer
+                currentOutput={step.output}
+                previousOutputs={step.previous_outputs}
+              />
+            )}
+
+            {inlineFeedbackMode && runId ? (
+              <div className="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden">
+                <InlineFeedback
+                  output={step.output}
+                  stepId={step.id}
+                  runId={runId}
+                  stepName={step.name}
+                  onReviewSubmitted={() => onRerunComplete?.()}
+                />
+              </div>
+            ) : (
+              <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
+                <pre className="whitespace-pre-wrap text-sm text-gray-300 font-mono leading-relaxed">
+                  {step.output}
+                </pre>
+              </div>
+            )}
           </div>
         )}
 

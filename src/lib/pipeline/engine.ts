@@ -222,22 +222,49 @@ export async function executePipeline(
     try {
       // Build prompt: agent definition + task instructions + input
       const { buildAgentPrompt } = await import("./agents");
-      const taskInstructions = def.prompt_template
-        .replace("{{input}}", previousOutput)
-        .replace("{{context}}", "")
-        .replace("{{original}}", run.input);
 
-      const prompt = buildAgentPrompt(
-        def.agent,
-        taskInstructions,
-        previousOutput
-      );
+      // For the test-summarizer, provide AC output as context for cross-referencing
+      let stepContext = "";
+      if (def.agent === "test-summarizer") {
+        const acStep = steps.find((s) => {
+          const acDef = stepDefs[steps.indexOf(s)];
+          return acDef && acDef.agent === "ac-writer";
+        });
+        if (acStep?.output) stepContext = acStep.output;
+      }
 
       // Store input for this step
       updateStep(runId, step.id, { input: previousOutput });
 
-      // Call the configured AI provider
-      const output = await callAgent(prompt, run);
+      let output: string;
+
+      // AC Writer: process one story at a time to avoid timeout issues
+      // with large batches. Split the input into individual stories,
+      // call the agent for each, and concatenate the results.
+      if (def.agent === "ac-writer") {
+        output = await executeAcWriterChunked(
+          def,
+          previousOutput,
+          stepContext,
+          run,
+          step.id,
+          runId
+        );
+      } else {
+        const taskInstructions = def.prompt_template
+          .replace("{{input}}", previousOutput)
+          .replace("{{context}}", stepContext)
+          .replace("{{original}}", run.input);
+
+        const prompt = buildAgentPrompt(
+          def.agent,
+          taskInstructions,
+          previousOutput
+        );
+
+        // Call the configured AI provider
+        output = await callAgent(prompt, run);
+      }
 
       updateStepStatus(runId, step.id, "completed", output);
       previousOutput = output;
@@ -281,8 +308,22 @@ export async function executePipeline(
           // Find which step to loop back to based on reviewer feedback
           const targetIndex = findRevisionTarget(output, stepDefs);
 
-          // Reset steps from targetIndex to current (exclusive) to pending
+          // Save current outputs before resetting, so we can show diffs
           const currentSteps = getSteps(runId);
+          for (let j = targetIndex; j < i; j++) {
+            const s = currentSteps[j];
+            if (s.output) {
+              const prevOutputs = s.previous_outputs || [];
+              prevOutputs.push({
+                revision: currentRun.revision_count - 1,
+                output: s.output,
+                completed_at: s.completed_at || new Date().toISOString(),
+              });
+              updateStep(runId, s.id, { previous_outputs: prevOutputs });
+            }
+          }
+
+          // Reset steps from targetIndex to current (exclusive) to pending
           for (let j = targetIndex; j < i; j++) {
             updateStep(runId, currentSteps[j].id, {
               status: "pending",
@@ -338,6 +379,8 @@ export async function executePipeline(
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
+      // The provider layer handles retries for rate-limit/transient errors.
+      // If we still get here, the error is non-retryable or retries were exhausted.
       updateStepStatus(runId, step.id, "failed", undefined, message);
       updateRunStatus(runId, "failed");
       emit(runId, "step_failed", step.id, { name: def.name, error: message });
@@ -439,6 +482,110 @@ function findRevisionTarget(
   // Default: go back to the step before Quality Review (the last content-producing step)
   const reviewIndex = stepDefs.findIndex((d) => d.agent === "story-reviewer");
   return Math.max(0, reviewIndex - 2);
+}
+
+/**
+ * Split decomposed stories input into individual stories.
+ * Looks for story headers like "### Story N:" or "## Story N:" or "### STORY-SLUG"
+ * and splits the input so each chunk contains exactly one story plus any
+ * preceding feature/section headers it belongs to.
+ */
+function splitStoriesFromInput(input: string): string[] {
+  const lines = input.split("\n");
+  const storyBoundaries: number[] = [];
+
+  // Find lines that start a new story (### headers within ## feature sections)
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Match story headers: "### Story", "### SLUG-NNN", or numbered story headers
+    if (/^###\s+(?:Story\b|[A-Z]+-\d+)/i.test(line)) {
+      storyBoundaries.push(i);
+    }
+  }
+
+  if (storyBoundaries.length <= 1) {
+    // 0 or 1 stories found — return the whole input as a single chunk
+    return [input];
+  }
+
+  // Extract the preamble (everything before the first story header)
+  // This includes feature headers, context, etc.
+  const preamble = lines.slice(0, storyBoundaries[0]).join("\n").trim();
+
+  // Also capture any ## feature header that precedes each story
+  const stories: string[] = [];
+  for (let i = 0; i < storyBoundaries.length; i++) {
+    const start = storyBoundaries[i];
+    const end =
+      i < storyBoundaries.length - 1
+        ? storyBoundaries[i + 1]
+        : lines.length;
+
+    // Look backwards from the story header to find its parent ## feature header
+    let featureHeader = "";
+    for (let j = start - 1; j >= 0; j--) {
+      if (/^##\s+(?!#)/.test(lines[j])) {
+        featureHeader = lines[j];
+        break;
+      }
+    }
+
+    const storyContent = lines.slice(start, end).join("\n").trim();
+    const parts = [preamble];
+    if (featureHeader) parts.push(featureHeader);
+    parts.push(storyContent);
+    stories.push(parts.join("\n\n"));
+  }
+
+  return stories;
+}
+
+/**
+ * Execute the AC Writer one story at a time.
+ * Splits the stories input, calls the AC writer for each individual story,
+ * emits progress events, and concatenates the results.
+ */
+async function executeAcWriterChunked(
+  def: StepDefinition,
+  storiesInput: string,
+  stepContext: string,
+  run: PipelineRun,
+  stepId: string,
+  runId: string
+): Promise<string> {
+  const { buildAgentPrompt } = await import("./agents");
+  const stories = splitStoriesFromInput(storiesInput);
+
+  // If only one story (or couldn't split), fall back to normal execution
+  if (stories.length <= 1) {
+    const taskInstructions = def.prompt_template
+      .replace("{{input}}", storiesInput)
+      .replace("{{context}}", stepContext)
+      .replace("{{original}}", run.input);
+    const prompt = buildAgentPrompt(def.agent, taskInstructions, storiesInput);
+    return callAgent(prompt, run);
+  }
+
+  const outputs: string[] = [];
+
+  for (let i = 0; i < stories.length; i++) {
+    emit(runId, "step_progress", stepId, {
+      message: `Processing story ${i + 1} of ${stories.length}`,
+      current: i + 1,
+      total: stories.length,
+    });
+
+    const taskInstructions = def.prompt_template
+      .replace("{{input}}", stories[i])
+      .replace("{{context}}", stepContext)
+      .replace("{{original}}", run.input);
+
+    const prompt = buildAgentPrompt(def.agent, taskInstructions, stories[i]);
+    const output = await callAgent(prompt, run);
+    outputs.push(output);
+  }
+
+  return outputs.join("\n\n---\n\n");
 }
 
 async function callAgent(
