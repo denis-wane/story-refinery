@@ -15,6 +15,71 @@ export interface ProviderConfig {
   model?: string;
 }
 
+// Retry configuration for rate-limit and transient error handling
+const MAX_RETRIES = 5;
+const BASE_DELAY_MS = 2_000; // 2 seconds
+const MAX_DELAY_MS = 120_000; // 2 minutes
+
+function isRetryableError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  // Anthropic SDK rate limit / overloaded errors
+  if (msg.includes("rate_limit") || msg.includes("rate limit")) return true;
+  if (msg.includes("overloaded") || msg.includes("529")) return true;
+  if (msg.includes("too many requests") || msg.includes("429")) return true;
+  // Transient server errors
+  if (msg.includes("500") || msg.includes("502") || msg.includes("503")) return true;
+  if (msg.includes("internal server error") || msg.includes("bad gateway")) return true;
+  if (msg.includes("service unavailable")) return true;
+  // Anthropic SDK typed errors
+  if ("status" in err) {
+    const status = (err as { status: number }).status;
+    if (status === 429 || status === 529 || (status >= 500 && status < 600)) return true;
+  }
+  // CLI timeout / transient failures
+  if (msg.includes("timed out") || msg.includes("timeout")) return true;
+  return false;
+}
+
+function getRetryDelay(attempt: number, err?: unknown): number {
+  // Check for Retry-After header hint from Anthropic SDK errors
+  if (err && typeof err === "object" && "headers" in err) {
+    const headers = (err as { headers?: Record<string, string> }).headers;
+    const retryAfter = headers?.["retry-after"];
+    if (retryAfter) {
+      const seconds = parseInt(retryAfter, 10);
+      if (!isNaN(seconds) && seconds > 0) {
+        return Math.min(seconds * 1_000, MAX_DELAY_MS);
+      }
+    }
+  }
+  // Exponential backoff with jitter: base * 2^attempt + random jitter
+  const exponential = BASE_DELAY_MS * Math.pow(2, attempt);
+  const jitter = Math.random() * BASE_DELAY_MS;
+  return Math.min(exponential + jitter, MAX_DELAY_MS);
+}
+
+async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (attempt < MAX_RETRIES && isRetryableError(err)) {
+        const delay = getRetryDelay(attempt, err);
+        console.warn(
+          `[provider] ${label}: retryable error (attempt ${attempt + 1}/${MAX_RETRIES}), waiting ${Math.round(delay / 1000)}s — ${err instanceof Error ? err.message.slice(0, 120) : err}`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastError;
+}
+
 export function getProviderConfig(): ProviderConfig {
   const get = (key: string): string => getConfigValue(key) ?? "";
 
@@ -38,11 +103,11 @@ export async function callProvider(prompt: string): Promise<string> {
 
   switch (config.provider) {
     case "subscription":
-      return callViaSubscription(prompt, config);
+      return withRetry(() => callViaSubscription(prompt, config), "subscription");
     case "api_key":
-      return callViaApiKey(prompt, config);
+      return withRetry(() => callViaApiKey(prompt, config), "api_key");
     case "bedrock":
-      return callViaBedrock(prompt, config);
+      return withRetry(() => callViaBedrock(prompt, config), "bedrock");
     default:
       throw new Error(`Unknown provider: ${config.provider}`);
   }

@@ -337,6 +337,137 @@ function htmlToPlainText(html: string): string {
     .trim();
 }
 
+// ── Epic / Feature fetch ──────────────────────────────────────────────
+
+export interface EpicPreview {
+  epic: JiraIssue;
+  children: JiraIssue[];
+  totalFound: number;
+}
+
+/**
+ * Fetch an epic/feature and all its child stories from Jira Cloud (SaaS).
+ * Uses two JQL strategies to catch both "Epic Link" and next-gen "parent" relationships.
+ */
+export async function fetchEpicChildren(epicKey: string): Promise<EpicPreview> {
+  const config = getJiraConfig();
+  const err = validateConfig(config);
+  if (err) throw new Error(err);
+
+  // 1. Fetch the epic/feature itself
+  const epic = await fetchJiraIssue(epicKey);
+
+  // 2. Find child issues — Jira Cloud supports both classic and next-gen hierarchies.
+  //    "Epic Link" is the classic custom field; "parent" covers next-gen projects.
+  //    We run both JQL queries and deduplicate by key.
+  const jqlParent = `parent = ${epicKey} ORDER BY rank ASC, key ASC`;
+  const jqlEpicLink = `"Epic Link" = ${epicKey} ORDER BY rank ASC, key ASC`;
+
+  const [parentResults, epicLinkResults] = await Promise.allSettled([
+    searchJiraIssues(jqlParent),
+    searchJiraIssues(jqlEpicLink),
+  ]);
+
+  const seen = new Set<string>();
+  const children: JiraIssue[] = [];
+
+  for (const result of [parentResults, epicLinkResults]) {
+    if (result.status === "fulfilled") {
+      for (const issue of result.value) {
+        if (!seen.has(issue.key)) {
+          seen.add(issue.key);
+          children.push(issue);
+        }
+      }
+    }
+    // Silently ignore failures — one strategy may not apply to every project type
+  }
+
+  return {
+    epic,
+    children,
+    totalFound: children.length,
+  };
+}
+
+/**
+ * Format an epic + children for the pipeline, including the epic context header.
+ */
+export function formatEpicForPipeline(preview: EpicPreview): string {
+  const now = new Date().toISOString();
+  const lines: string[] = [
+    "# Imported Stories",
+    "",
+    "## Source",
+    "- **Type:** Jira (Epic Import)",
+    `- **Epic:** ${preview.epic.key}: ${preview.epic.summary}`,
+    `- **Import date:** ${now}`,
+    `- **Stories found:** ${preview.totalFound}`,
+    "",
+    "## Epic Context",
+    "",
+    `### ${preview.epic.key}: ${preview.epic.summary}`,
+    "",
+    "**Description:**",
+    preview.epic.description || "_No description provided._",
+    "",
+  ];
+
+  if (preview.epic.acceptanceCriteria) {
+    lines.push("**Acceptance Criteria:**");
+    lines.push(preview.epic.acceptanceCriteria);
+    lines.push("");
+  }
+
+  lines.push("---", "", "## Stories", "");
+
+  // Reuse the per-issue formatting from the existing function
+  for (const issue of preview.children) {
+    lines.push(`### ${issue.key}: ${issue.summary}`);
+    lines.push("");
+    lines.push(`**Source ID:** ${issue.key}`);
+    lines.push(`**Status:** ${issue.status}`);
+    lines.push(`**Assignee:** ${issue.assignee}`);
+    lines.push("");
+    lines.push("**Description:**");
+    lines.push(issue.description || "_No description provided._");
+    lines.push("");
+    lines.push("**Existing Acceptance Criteria:**");
+    lines.push(issue.acceptanceCriteria || "_No acceptance criteria found in source._");
+    lines.push("");
+
+    if (issue.comments.length > 0) {
+      lines.push("**Comments/Context:**");
+      for (const c of issue.comments) {
+        const date = c.created ? ` (${c.created.slice(0, 10)})` : "";
+        lines.push(`- **${c.author}**${date}: ${c.body}`);
+      }
+      lines.push("");
+    }
+
+    lines.push("**Links & Dependencies:**");
+    if (issue.linkedIssues.length > 0 || issue.epic) {
+      if (issue.epic) lines.push(`- Epic: ${issue.epic}`);
+      for (const link of issue.linkedIssues) {
+        lines.push(`- ${link.type}: ${link.key} — ${link.summary}`);
+      }
+    } else {
+      lines.push("_No linked issues._");
+    }
+    lines.push("");
+
+    lines.push("**Metadata:**");
+    lines.push(`- Priority: ${issue.priority || "None"}`);
+    lines.push(`- Labels: ${issue.labels.length > 0 ? issue.labels.join(", ") : "None"}`);
+    lines.push(`- Sprint: ${issue.sprint || "None"}`);
+    lines.push("");
+    lines.push("---");
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
 // ── Format for pipeline ────────────────────────────────────────────────
 
 export function formatJiraStoriesForPipeline(

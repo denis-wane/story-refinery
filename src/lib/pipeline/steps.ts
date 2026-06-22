@@ -29,14 +29,28 @@ export const GENERATE_STEPS: StepDefinition[] = [
 {{context}}`,
   },
   {
+    name: "Clarify",
+    agent: "clarifier",
+    description:
+      "Extract ambiguities from the analysis into prioritized clarifying questions for the stakeholder to answer.",
+    review_gate: true,
+    prompt_template: `Review the analysis below and produce your prioritized list of clarifying questions. Include default assumptions for each question so the pipeline can proceed even with partial answers.
+
+## Analysis
+{{input}}
+
+## Original Input
+{{original}}`,
+  },
+  {
     name: "Decompose Features",
     agent: "story-decomposer",
     description:
       "Break identified features into individual user stories with clear scope.",
     review_gate: true,
-    prompt_template: `Given the analysis below, decompose all identified features into well-scoped user stories. Follow your output format exactly.
+    prompt_template: `Given the analysis and stakeholder clarifications below, decompose all identified features into well-scoped user stories. Follow your output format exactly. Use the stakeholder's answers to resolve any ambiguities — do not leave questions open that have been answered.
 
-## Analysis
+## Analysis & Clarifications
 {{input}}`,
   },
   {
@@ -62,12 +76,30 @@ export const GENERATE_STEPS: StepDefinition[] = [
 {{input}}`,
   },
   {
+    name: "Summarize Test Coverage",
+    agent: "test-summarizer",
+    description:
+      "Produce a compact coverage digest from raw test specs for the reviewer. Extracts coverage matrices, scenario counts, gaps, and quality signals.",
+    review_gate: false,
+    prompt_template: `Produce a compact test coverage digest from the raw test specifications below. Follow your output format exactly. Count scenarios and steps precisely by scanning the actual content.
+
+NOTE: Test specifications below are a coverage digest (not the raw Gherkin). Use the coverage matrices, gap analysis, and statistics to evaluate test coverage and quality.
+
+## Acceptance Criteria (for cross-reference)
+{{context}}
+
+## Raw Test Specifications
+{{input}}`,
+  },
+  {
     name: "Quality Review",
     agent: "story-reviewer",
     description:
       "Score the complete package against the quality rubric. Identify issues and suggest improvements.",
     review_gate: true,
     prompt_template: `Perform a quality review of the complete story package below. Score each story against your rubric (80+ to pass). Provide specific, actionable feedback.
+
+NOTE: Test specifications below are a coverage digest (not the raw Gherkin). Use the coverage matrices, gap analysis, and statistics to evaluate test coverage and quality.
 
 ## Complete Package
 {{input}}`,
@@ -123,12 +155,25 @@ export const REFINE_STEPS: StepDefinition[] = [
 {{input}}`,
   },
   {
+    name: "Summarize Test Coverage",
+    agent: "test-summarizer",
+    description:
+      "Produce a compact coverage digest from raw test specs for the reviewer.",
+    review_gate: false,
+    prompt_template: `Produce a compact test coverage digest from the raw test specifications below. Follow your output format exactly. Count scenarios and steps precisely by scanning the actual content.
+
+## Raw Test Specifications
+{{input}}`,
+  },
+  {
     name: "Quality Review",
     agent: "story-reviewer",
     description:
       "Score the refined package. Compare against original to show improvement.",
     review_gate: true,
     prompt_template: `Perform a quality review of the refined story package. Score each story against your rubric (80+ to pass). Compare against the original and highlight improvements.
+
+NOTE: Test specifications below are a coverage digest (not the raw Gherkin). Use the coverage matrices, gap analysis, and statistics to evaluate test coverage and quality.
 
 ## Refined Package
 {{input}}

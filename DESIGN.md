@@ -11,12 +11,13 @@ Takes a raw description from the user and runs a multi-step agent pipeline to pr
 
 **Pipeline steps:**
 1. **Analyze** — Parse input, identify themes, extract features
-2. **Decompose** — Break features into user stories
-3. **Draft AC** — Write acceptance criteria for each story
-4. **Generate Tests** — Produce test specifications from AC
-5. **Review** — Score the complete package against quality rubric
+2. **Clarify** — Extract ambiguities into prioritized questions for the stakeholder (review gate)
+3. **Decompose** — Break features into user stories, informed by stakeholder answers
+4. **Draft AC** — Write acceptance criteria for each story
+5. **Generate Tests** — Produce test specifications from AC
+6. **Review** — Score the complete package against quality rubric
 
-Each step produces output artifacts. A human review can be inserted after any step.
+Each step produces output artifacts. A human review can be inserted after any step. The Clarify step has a review gate by default — the stakeholder answers questions before decomposition proceeds.
 
 ### Refine
 Reads existing features/stories from Jira or the local filesystem and runs them through a refinement pipeline.

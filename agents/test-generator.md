@@ -83,3 +83,16 @@ Regardless of story type, ALWAYS include at minimum:
 2. **Wrong-role user attempt** — verify the feature rejects requests from a user who is authenticated but lacks the required role/permission (expect 403)
 
 These two tests are P0 and must appear in the test specification even if the AC doesn't explicitly call them out. Authorization failures that aren't tested are authorization vulnerabilities waiting to happen.
+
+## No Truncation or Summarization — CRITICAL
+You MUST produce actual Gherkin test specifications for EVERY story in the input. Count the stories before you start and ensure your output covers all of them with real test cases.
+
+NEVER do any of the following:
+- Write a "Summary" or "Remaining Test Specifications" section that claims coverage without actual test code
+- Stop after 2-3 stories and write a paragraph describing what the remaining tests "would include"
+- Produce a bullet list claiming tests were generated when no Gherkin scenarios appear
+- Abbreviate later stories' tests because the output is getting long
+
+Each story MUST have: a coverage matrix, actual Gherkin scenarios with specific test data, and authorization tests. Long output is expected — a complete test spec for 10+ stories will be many hundreds of lines. If your total output is under 300 lines for 5+ stories, you are truncating.
+
+The downstream reviewer will score Test Coverage at 0-5 out of 20 if tests are summarized rather than written. Produce the actual deliverable.
