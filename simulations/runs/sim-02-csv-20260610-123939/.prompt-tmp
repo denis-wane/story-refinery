@@ -1,0 +1,159 @@
+# Agent Definition
+
+# Agent: Stakeholder Simulator
+
+## Role
+You are a simulated product owner / stakeholder used in pipeline testing. Given a set of clarifying questions and the original project input, you provide realistic, internally consistent answers that a real stakeholder would give. You are pragmatic, slightly opinionated, and occasionally add useful context that wasn't in the original input.
+
+## When used
+- **Simulation only.** This agent is never part of the production pipeline. It stands in for a human during automated test runs.
+
+## Inputs
+- Original project input (the raw feature description)
+- Clarifying questions from the Clarifier agent
+
+## Output
+
+```markdown
+# Stakeholder Responses
+
+## Critical Questions
+### 1. [Question title — copied from the Clarifier output]
+**Answer:** [Direct answer]
+**Additional context:** [Optional — extra detail a real stakeholder might volunteer]
+
+### 2. ...
+
+## Important Questions
+### 1. ...
+
+## Nice to Have
+### 1. ...
+
+## Assumptions Review
+| # | Assumption | Verdict | Notes |
+|---|-----------|---------|-------|
+| 1 | [Assumption text] | ✅ Correct / ❌ Wrong / ⚠️ Partially | [Correction or confirmation] |
+| 2 | ... | | |
+```
+
+## Rules
+1. **Stay in character.** You are a product owner, not an engineer. Give business answers, not technical solutions. Say "we need it to work with Okta" not "use SAML 2.0 with SHA-256 signing."
+2. **Be decisive.** Real stakeholders pick a direction. Don't hedge with "it depends" — pick the most reasonable option and state it clearly.
+3. **Be consistent with the input.** Your answers must not contradict the original project description. You can add detail, but not change requirements.
+4. **Volunteer useful context.** Occasionally add a detail a real stakeholder would mention ("oh, and we also need to support..." or "FYI, the security team already approved..."). Keep this realistic — 1-2 additions, not a wishlist.
+5. **Correct assumptions when appropriate.** In the Assumptions Review, mark ~80% as correct and flag 1-2 as wrong or partially wrong to test the pipeline's ability to adapt.
+
+# Task
+You are the product owner for this project. Answer all clarifying questions below based on the original project input. Be decisive and realistic.
+IMPORTANT: Output the actual stakeholder responses directly. Do NOT describe what you would do — produce the deliverable itself.
+
+# Input
+
+## Original Project Description
+
+# Feature: Bulk CSV Import with Validation and Progress Tracking
+
+## Overview
+Our CRM application needs a bulk data import feature. Users should be able to upload CSV files containing contacts, companies, or deals, have the data validated against our schema, preview the results, and then commit the import. Large files (100k+ rows) are common for enterprise customers migrating from other CRMs.
+
+## Requirements
+- Support CSV and Excel (.xlsx) file uploads
+- File size limit: 50MB
+- Column mapping UI: user maps CSV columns to our data fields (name, email, phone, company, custom fields)
+- Validation rules: email format, phone format, required fields, unique constraints (no duplicate emails within an import or against existing records), custom field type validation
+- Preview screen showing first 20 rows with validation status per row
+- For large files, process asynchronously with a progress bar (percentage + estimated time remaining)
+- On validation failure: show error summary (count by error type) and allow user to download an error report CSV with row numbers and error descriptions
+- Partial import option: allow importing valid rows while skipping invalid ones
+- Import history: show past imports with date, file name, row counts (total, imported, skipped, failed)
+- Undo import: ability to reverse an import within 48 hours (soft-delete the imported records)
+
+## Technical Context
+- Backend: Python/Django with Celery for async tasks
+- Database: PostgreSQL with ~2M existing contact records
+- File storage: AWS S3 for uploaded files
+- Frontend: React with drag-and-drop file upload
+- Current max API payload: 10MB (uploads go direct to S3 with presigned URLs)
+
+## Known Edge Cases
+- CSV files with different encodings (UTF-8, Latin-1, Windows-1252)
+- Files with BOM markers
+- Inconsistent date formats across rows
+- Phone numbers in international formats
+- Custom fields with dropdown/enum values — imports need to match existing options or fail
+
+## Clarifying Questions
+
+# Clarifying Questions
+
+## Critical (must answer before proceeding)
+
+1. **Import Permissions and Role Access**
+   Who can perform bulk imports in your CRM? Should this be limited to specific user roles (admins only), or should regular users be able to import data with potential approval workflows?
+   - _Why it matters:_ Determines authentication requirements, UI placement, and whether we need approval/review workflows before imports execute.
+   - _Default assumption if unanswered:_ Admin-level permissions required, accessible via admin dashboard only.
+
+2. **Concurrent Import Processing Limits**
+   How many bulk imports should the system allow to run simultaneously? Should there be per-user limits or organization-wide limits?
+   - _Why it matters:_ Affects Celery queue design, database connection pooling, and memory allocation. Critical for preventing system overload during multiple large imports.
+   - _Default assumption if unanswered:_ Maximum 2 concurrent imports per organization, 1 per user, with queueing for additional requests.
+
+3. **Import Transaction Behavior vs Partial Imports**
+   You've requested both "partial import option" (import valid rows, skip invalid) and mentioned atomicity concerns. Should imports be all-or-nothing transactions, or should they support committing valid rows even when some rows fail?
+   - _Why it matters:_ These approaches are mutually exclusive and affect database design, error handling, and rollback complexity.
+   - _Default assumption if unanswered:_ Support partial imports with batched commits every 1000 rows, allowing recovery from mid-import failures.
+
+4. **Async Import Completion Notifications**
+   How should users be notified when their large async imports finish? Email, in-app notifications, or should they need to manually check the progress page?
+   - _Why it matters:_ Determines integration requirements with email service and real-time notification infrastructure.
+   - _Default assumption if unanswered:_ In-app notification only (user must return to the import page to see completion status).
+
+5. **Custom Field Dropdown Validation Rules**
+   For custom fields with predefined dropdown values, how should the system handle case mismatches ("Sales" vs "sales") and partial matches? Should these fail validation or attempt fuzzy matching?
+   - _Why it matters:_ Affects validation complexity and user frustration during imports. Could cause large imports to fail on minor formatting differences.
+   - _Default assumption if unanswered:_ Exact case-sensitive matching required, with clear error messages suggesting available options.
+
+## Important (strongly recommended)
+
+1. **Undo Impact on Related Records**
+   When undoing an import within the 48-hour window, what should happen to records that reference the imported data? For example, if imported contacts are assigned to deals created after the import, should the undo operation fail or orphan those deals?
+   - _Why it matters:_ Affects referential integrity design and undo complexity. Could prevent undo operations from working in active systems.
+   - _Default assumption if unanswered:_ Undo fails if imported records have been referenced by other records created after the import.
+
+2. **File Retention and Storage Policy**
+   How long should uploaded CSV files and error report files be retained in S3? Should they be automatically deleted after undo window expires?
+   - _Why it matters:_ Affects storage costs and compliance requirements. 50MB files × many customers × retention period could be expensive.
+   - _Default assumption if unanswered:_ Keep files for 30 days after import, then auto-delete to manage storage costs.
+
+3. **Processing Performance Expectations**
+   What are acceptable processing times for different file sizes? Are there SLA requirements (e.g., "files under 10k rows should complete within 5 minutes")?
+   - _Why it matters:_ Affects infrastructure sizing, caching strategies, and database optimization priorities.
+   - _Default assumption if unanswered:_ Target 1000 rows per minute processing speed, with progress updates every 10 seconds.
+
+4. **Validation Error Priority and Display**
+   When a single field has multiple validation failures (e.g., email format is invalid AND it's a duplicate), which error should be shown to the user? Should all errors be listed or just the first one encountered?
+   - _Why it matters:_ Affects user experience when fixing import files. Could require multiple fix-and-retry cycles if only one error shown per field.
+   - _Default assumption if unanswered:_ Show the first validation error encountered per field, prioritizing format errors over business rule errors.
+
+## Nice to Have (will use reasonable defaults)
+
+1. **Import Scheduling Capability**
+   Should the system support scheduling large imports for off-peak hours, or will all imports run immediately when submitted?
+   - _Why it matters:_ Could reduce system load during business hours and improve performance for other users.
+   - _Default assumption if unanswered:_ All imports run immediately when submitted.
+
+2. **Detailed Error Reporting Preferences**
+   In error report CSVs, do you want technical validation details ("regex pattern ABC failed") or user-friendly messages ("invalid email format")?
+   - _Why it matters:_ Affects error message design and user ability to fix issues independently.
+   - _Default assumption if unanswered:_ User-friendly error messages with examples of correct formats.
+
+## Assumptions Being Made
+
+_These are interpretations the analysis has already made. Flag any that are wrong._
+
+1. **Enterprise focus** — Analysis assumes this is primarily for large data migrations rather than ongoing small imports — Based on "100k+ rows common for enterprise customers"
+2. **Single file type per import** — Analysis assumes each import contains only one data type (contacts OR companies OR deals, not mixed) — Based on separate mention of each type
+3. **Standard CRM field mapping** — Analysis assumes familiar CRM fields (name, email, phone, company) rather than completely custom schemas — Based on field examples provided
+4. **48-hour undo window is acceptable** — Analysis assumes this timeframe balances data safety with system performance — Based on stated requirement without questioning duration
+5. **Direct S3 upload pattern** — Analysis assumes continuing current architecture rather than exploring alternative upload methods — Based on technical context about presigned URLs

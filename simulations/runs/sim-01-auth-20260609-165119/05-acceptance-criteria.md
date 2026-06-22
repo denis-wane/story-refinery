@@ -1,0 +1,1218 @@
+# Acceptance Criteria: SESSION-001 — Organization session timeout configuration
+
+## Refined Story Statement
+As an Organization Admin, I want to configure session timeout duration for my organization's users, so that I can balance security requirements and user productivity according to our company's risk tolerance and compliance needs.
+
+## Assumptions
+- Timeout range is 15 minutes to 8 hours — **Confirmed**
+- New timeout applies to new sessions immediately — **Confirmed**
+- Existing sessions continue with their original timeout — **Unconfirmed**
+
+## Acceptance Criteria
+
+### AC-1: Session timeout configuration interface
+**Given** I am an Organization Admin
+**When** I navigate to security settings and adjust session timeout to 2 hours
+**Then** the setting is saved and displays "Sessions will timeout after 2 hours of inactivity"
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-2: New session timeout application
+**Given** I have set organization session timeout to 1 hour
+**When** a user logs in after the setting change
+**Then** their session is configured to expire after 1 hour of inactivity
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-3: Session timeout range validation
+**Given** I try to set session timeout to 10 minutes (below minimum)
+**When** I save the setting
+**Then** I receive error "Session timeout must be between 15 minutes and 8 hours" and the setting is not saved
+
+**Category:** boundary
+**Priority:** must-have
+
+### AC-4: Session timeout range validation maximum
+**Given** I try to set session timeout to 12 hours (above maximum)
+**When** I save the setting
+**Then** I receive error "Session timeout must be between 15 minutes and 8 hours" and the setting reverts to current value
+
+**Category:** boundary
+**Priority:** must-have
+
+### AC-5: Existing session behavior during timeout change
+**Given** users have active sessions with 4-hour timeout and I change organization setting to 1 hour
+**When** the change is saved
+**Then** existing sessions continue with their original 4-hour timeout until they expire or users re-login
+
+**Category:** edge-case
+**Priority:** should-have
+
+### AC-6: Default timeout for new organizations
+**Given** I am setting up a new organization
+**When** the organization is created
+**Then** session timeout is set to the default value of 8 hours
+
+**Category:** happy-path
+**Priority:** should-have
+
+### AC-7: Session activity tracking accuracy
+**Given** a user has a 30-minute session timeout
+**When** they perform actions (clicks, API calls) every 10 minutes
+**Then** their session remains active and does not timeout
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-8: Inactive session timeout enforcement
+**Given** a user has a 30-minute session timeout and no activity for 31 minutes
+**When** they try to perform any action
+**Then** they are logged out with message "Session expired due to inactivity" and redirected to login
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-9: Multi-tab session activity consolidation
+**Given** a user has the application open in 3 browser tabs with 30-minute timeout
+**When** they are active in any tab
+**Then** the session timeout is refreshed across all tabs
+
+**Category:** edge-case
+**Priority:** should-have
+
+### AC-10: Session configuration database failure
+**Given** I try to save a session timeout setting
+**When** the database is unavailable
+**Then** I receive error "Unable to save settings. Please try again." and the current setting is preserved
+
+**Category:** error-handling
+**Priority:** must-have
+
+## Non-Functional Requirements
+
+### Error Handling
+| Scenario | Expected Behavior | Priority |
+|----------|------------------|----------|
+| Session store unavailable | Use default 8-hour timeout for new sessions | must-have |
+| Timeout calculation overflow | Cap calculation at maximum timeout value | should-have |
+| Concurrent setting changes | Last save wins with admin notification of conflict | should-have |
+
+### Performance
+- **Response time:** Session timeout check adds < 10ms to each request
+- **Scale:** Support session tracking for 10,000 concurrent users per organization
+
+### Security
+- **Input validation:** Timeout values validated as positive integers within allowed range
+- **Authorization:** Only Organization Admins can modify session timeout settings
+- **Policy enforcement:** Session timeout cannot be disabled (minimum 15 minutes enforced)
+
+---
+
+# Acceptance Criteria: SESSION-002 — Session timeout warning and extension
+
+## Refined Story Statement
+As an End User, I want to receive a warning before my session expires with an option to extend it, so that I don't lose my work due to automatic logout and can stay productive during long tasks.
+
+## Assumptions
+- Warning appears 5 minutes before timeout — **Confirmed**
+- Extension grants full timeout duration — **Confirmed**
+- Form submission pauses warning system — **Confirmed**
+
+## Acceptance Criteria
+
+### AC-1: Session timeout warning modal display
+**Given** I have a 30-minute session timeout and have been inactive for 25 minutes
+**When** 5 minutes remain before timeout
+**Then** a modal appears with countdown "Session expires in 4:59" and "Extend Session" button
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-2: Session extension on user interaction
+**Given** the session warning modal is displayed
+**When** I click "Extend Session"
+**Then** my session is extended for the full timeout duration (30 minutes) and the modal closes
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-3: Automatic logout after warning ignored
+**Given** the session warning modal has been displayed for 5 minutes
+**When** I take no action
+**Then** I am automatically logged out and redirected to login page with message "Session expired"
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-4: Form submission pauses timeout warnings
+**Given** I am filling out a form and the session warning would normally appear
+**When** I am actively typing in form fields or have unsaved form data
+**Then** the warning modal is delayed until form is submitted or I navigate away
+
+**Category:** edge-case
+**Priority:** must-have
+
+### AC-5: Multiple warning modal prevention
+**Given** a session warning modal is already displayed
+**When** the warning timer would trigger again
+**Then** no additional modals appear and the existing modal countdown continues
+
+**Category:** boundary
+**Priority:** must-have
+
+### AC-6: Warning modal countdown accuracy
+**Given** the session warning modal shows "3:45" remaining
+**When** 30 seconds pass
+**Then** the display updates to "3:15" with real-time countdown
+
+**Category:** happy-path
+**Priority:** should-have
+
+### AC-7: Background tab session warning
+**Given** the application is in a background browser tab when session warning triggers
+**When** the warning time arrives
+**Then** the browser tab title shows "* Session Expiring" to alert the user
+
+**Category:** edge-case
+**Priority:** should-have
+
+### AC-8: Session extension with concurrent sessions
+**Given** I have the application open in multiple tabs and extend session in one tab
+**When** the extension occurs
+**Then** all tabs in the same browser receive the session extension
+
+**Category:** edge-case
+**Priority:** should-have
+
+### AC-9: Network failure during session extension
+**Given** I click "Extend Session" but the network request fails
+**When** the extension fails
+**Then** I see error "Unable to extend session. Please refresh page or save your work." and the countdown continues
+
+**Category:** error-handling
+**Priority:** must-have
+
+### AC-10: Very short session timeout warning adjustment
+**Given** my organization sets session timeout to 15 minutes (minimum)
+**When** 5 minutes remain (warning time)
+**Then** the warning appears at 5 minutes remaining, giving me adequate time to extend
+
+**Category:** boundary
+**Priority:** should-have
+
+## Non-Functional Requirements
+
+### Error Handling
+| Scenario | Expected Behavior | Priority |
+|----------|------------------|----------|
+| JavaScript disabled | Show persistent warning banner with countdown | must-have |
+| Session extension API timeout | Retry extension request 3 times before showing error | should-have |
+| Browser clock out of sync | Use server timestamp for accurate countdown | must-have |
+
+### Performance
+- **Response time:** Session extension request completes within 1 second
+- **Scale:** Support 5,000 concurrent session warnings
+
+### Security
+- **Input validation:** Session extension requests validated against current session
+- **Authorization:** Session extension requires valid authenticated session
+- **Rate limiting:** Limit session extensions to 1 per minute to prevent abuse
+
+### Accessibility
+- Screen reader announcements for session warning with clear countdown
+- High contrast warning modal for vision impaired users
+- Keyboard navigation for "Extend Session" button
+
+---
+
+# Acceptance Criteria: SSO-CORE-001 — SAML 2.0 authentication flow
+
+## Refined Story Statement
+As an SSO User, I want to log in using my company's SAML 2.0 identity provider, so that I can access the platform with my existing corporate credentials without managing a separate password.
+
+## Assumptions
+- Only SP-initiated SAML flow is supported initially — **Confirmed**
+- SAML assertions are not encrypted — **Confirmed**
+- Attribute mapping is configurable per organization — **Unconfirmed**
+
+## Acceptance Criteria
+
+### AC-1: SAML authentication initiation
+**Given** my organization has SAML configured
+**When** I click "Login with SSO" on the login page
+**Then** I am redirected to my organization's identity provider with a valid SAML authentication request
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-2: Successful SAML assertion processing
+**Given** I authenticate successfully at my identity provider
+**When** the IdP returns a signed SAML assertion to our service
+**Then** my user account is identified or created and I am logged in to the application
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-3: SAML assertion signature validation
+**Given** the identity provider sends a SAML assertion
+**When** our service receives the assertion
+**Then** the digital signature is validated against the IdP's certificate before processing user data
+
+**Category:** security
+**Priority:** must-have
+
+### AC-4: User attribute mapping from SAML
+**Given** the SAML assertion contains attributes: email="user@company.com", name="John Doe"
+**When** the assertion is processed
+**Then** the user account is created or updated with email and name from the SAML attributes
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-5: Expired SAML assertion rejection
+**Given** the identity provider sends a SAML assertion with NotOnOrAfter timestamp in the past
+**When** our service validates the assertion
+**Then** the authentication fails with error "SAML assertion expired" and user is redirected to re-authenticate
+
+**Category:** edge-case
+**Priority:** must-have
+
+### AC-6: Invalid SAML assertion rejection
+**Given** the SAML assertion has an invalid signature or missing required elements
+**When** our service processes the assertion
+**Then** authentication fails with error "Invalid SAML response" and the attempt is logged for security monitoring
+
+**Category:** edge-case
+**Priority:** must-have
+
+### AC-7: SAML assertion replay attack prevention
+**Given** a valid SAML assertion has already been used
+**When** the same assertion is submitted again within the validity window
+**Then** the authentication fails with error "SAML assertion already used" to prevent replay attacks
+
+**Category:** security
+**Priority:** must-have
+
+### AC-8: Organization-specific SAML configuration
+**Given** multiple organizations have different SAML configurations
+**When** a user authenticates via SAML
+**Then** the correct organization's IdP configuration is used based on the authentication request context
+
+**Category:** boundary
+**Priority:** must-have
+
+### AC-9: SAML authentication with existing local account
+**Given** a user already has a local password account with email "user@company.com"
+**When** they authenticate via SAML with the same email
+**Then** the accounts are linked and the user can use either authentication method
+
+**Category:** edge-case
+**Priority:** should-have
+
+### AC-10: Identity provider unavailable error handling
+**Given** the SAML identity provider is not responding
+**When** a user attempts SAML authentication
+**Then** they receive error "Identity provider unavailable. Please try again later." with option to contact support
+
+**Category:** error-handling
+**Priority:** must-have
+
+### AC-11: Malformed SAML assertion handling
+**Given** the identity provider sends a malformed SAML response (invalid XML)
+**When** our service attempts to parse the response
+**Then** authentication fails gracefully with error "Invalid authentication response" and the error is logged
+
+**Category:** error-handling
+**Priority:** must-have
+
+## Non-Functional Requirements
+
+### Error Handling
+| Scenario | Expected Behavior | Priority |
+|----------|------------------|----------|
+| IdP certificate expired | Show clear error "Contact your IT department" | must-have |
+| SAML metadata parsing error | Log error and disable SSO with admin notification | must-have |
+| Clock synchronization issues | Allow ±5 minute tolerance for assertion timestamps | must-have |
+
+### Performance
+- **Response time:** SAML assertion processing completes within 2 seconds
+- **Scale:** Support 200 concurrent SAML authentications
+
+### Security
+- **Input validation:** All SAML response data validated against XML schema
+- **Authorization:** SAML configuration restricted to Organization Admins
+- **Cryptographic validation:** All SAML assertions verified with up-to-date certificate chains
+- **Audit logging:** All SAML authentication attempts logged per AUTH-LOG-001
+
+---
+
+# Acceptance Criteria: SSO-CORE-002 — OpenID Connect authentication flow
+
+## Refined Story Statement
+As an SSO User, I want to log in using my company's OpenID Connect identity provider, so that I can use modern OAuth 2.0-based authentication with my existing corporate credentials.
+
+## Assumptions
+- Only Authorization Code flow is supported (not Implicit) — **Confirmed**
+- UserInfo endpoint integration is required — **Confirmed**
+- Token refresh is not implemented in initial version — **Confirmed**
+
+## Acceptance Criteria
+
+### AC-1: OIDC authentication initiation
+**Given** my organization has OpenID Connect configured
+**When** I click "Login with SSO" on the login page
+**Then** I am redirected to the OIDC provider's authorization endpoint with proper scope (openid email profile)
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-2: Authorization code exchange for tokens
+**Given** I authorize the application at the OIDC provider
+**When** the provider redirects back with an authorization code
+**Then** our service exchanges the code for access token and ID token using the token endpoint
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-3: ID token validation and claims extraction
+**Given** we receive an ID token from the OIDC provider
+**When** the token is processed
+**Then** the JWT signature is validated and claims (sub, email, name) are extracted for user authentication
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-4: UserInfo endpoint integration
+**Given** we have a valid access token from OIDC authentication
+**When** creating or updating the user profile
+**Then** additional user information is fetched from the UserInfo endpoint and used to populate user attributes
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-5: State parameter CSRF protection
+**Given** an OIDC authentication is initiated
+**When** the authorization request includes a random state parameter
+**Then** the state is validated on callback to prevent CSRF attacks
+
+**Category:** security
+**Priority:** must-have
+
+### AC-6: Invalid authorization code handling
+**Given** the OIDC provider callback includes an invalid or expired authorization code
+**When** our service attempts token exchange
+**Then** authentication fails with error "Authentication failed. Please try again." and user is redirected to login
+
+**Category:** edge-case
+**Priority:** must-have
+
+### AC-7: JWT signature validation failure
+**Given** an ID token with invalid signature is received
+**When** token validation occurs
+**Then** authentication fails with error "Invalid authentication response" and the attempt is logged
+
+**Category:** security
+**Priority:** must-have
+
+### AC-8: OIDC error response handling
+**Given** the OIDC provider returns an error (access_denied, server_error)
+**When** the callback is processed
+**Then** user sees appropriate error message and is redirected to login with option to retry
+
+**Category:** error-handling
+**Priority:** must-have
+
+### AC-9: Missing required claims handling
+**Given** the ID token lacks required claims (email missing)
+**When** user information is processed
+**Then** authentication fails with error "Incomplete profile information. Contact your IT department."
+
+**Category:** boundary
+**Priority:** must-have
+
+### AC-10: OIDC configuration discovery
+**Given** an organization provides their OIDC issuer URL
+**When** configuration is set up
+**Then** our service automatically discovers endpoints (.well-known/openid-configuration) and validates the configuration
+
+**Category:** happy-path
+**Priority:** should-have
+
+### AC-11: Token endpoint communication failure
+**Given** we attempt to exchange authorization code for tokens
+**When** the OIDC provider's token endpoint is unavailable
+**Then** authentication fails with error "Identity provider unavailable. Please try again." and error is logged
+
+**Category:** error-handling
+**Priority:** must-have
+
+## Non-Functional Requirements
+
+### Error Handling
+| Scenario | Expected Behavior | Priority |
+|----------|------------------|----------|
+| UserInfo endpoint timeout | Proceed with authentication using ID token claims only | should-have |
+| JWKS endpoint unavailable | Cache keys and use cached version, fail after 1 hour | must-have |
+| Discovery document invalid | Disable OIDC and alert admin immediately | must-have |
+
+### Performance
+- **Response time:** OIDC token exchange completes within 3 seconds
+- **Scale:** Support 200 concurrent OIDC authentications
+
+### Security
+- **Input validation:** All OAuth 2.0 parameters validated against RFC 6749
+- **Authorization:** OIDC configuration restricted to Organization Admins
+- **Token validation:** JWT signature verified with current JWKS
+- **Audit logging:** All OIDC authentication attempts logged per AUTH-LOG-001
+
+---
+
+# Acceptance Criteria: SSO-ADMIN-001 — Organization SSO configuration
+
+## Refined Story Statement
+As an Organization Admin, I want to configure SAML and OpenID Connect settings for my organization, so that my users can authenticate through our corporate identity provider.
+
+## Assumptions
+- Only one IdP per organization initially — **Confirmed**
+- Configuration requires uploading metadata or manual entry — **Confirmed**
+- Test connection validates configuration before saving — **Confirmed**
+
+## Acceptance Criteria
+
+### AC-1: SAML metadata upload and parsing
+**Given** I have SAML metadata XML from my identity provider
+**When** I upload the metadata file in SSO configuration
+**Then** the system parses endpoints, entity ID, and certificate information and pre-fills the configuration form
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-2: Manual SAML configuration entry
+**Given** I don't have metadata but know my IdP details
+**When** I manually enter SSO URL, entity ID, and upload the signing certificate
+**Then** the configuration is saved and ready for testing
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-3: OIDC discovery configuration
+**Given** I have my organization's OIDC issuer URL
+**When** I enter the issuer URL and client credentials
+**Then** the system automatically discovers endpoints and validates the configuration
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-4: Attribute mapping configuration
+**Given** I have SSO configured
+**When** I set up attribute mapping (email → email, displayName → name)
+**Then** user attributes from SSO will be mapped to the correct user profile fields
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-5: SSO configuration test connection
+**Given** I have entered SSO configuration details
+**When** I click "Test Connection"
+**Then** the system validates connectivity to the IdP and shows success or specific error messages
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-6: Invalid certificate handling
+**Given** I upload an expired or invalid certificate for SAML
+**When** the configuration is processed
+**Then** I receive error "Invalid certificate. Please check expiration date and format." and configuration is not saved
+
+**Category:** edge-case
+**Priority:** must-have
+
+### AC-7: OIDC client credential validation
+**Given** I enter incorrect client ID or secret for OIDC
+**When** I test the connection
+**Then** I receive error "Authentication failed with identity provider. Check client credentials."
+
+**Category:** edge-case
+**Priority:** must-have
+
+### AC-8: Configuration overwrite protection
+**Given** I already have working SSO configuration
+**When** I attempt to save new configuration
+**Then** I see warning "This will replace existing SSO configuration and may affect user access. Continue?" with confirmation required
+
+**Category:** boundary
+**Priority:** must-have
+
+### AC-9: Metadata URL auto-refresh setup
+**Given** I provide a metadata URL instead of uploading a file
+**When** the configuration is saved
+**Then** the system periodically fetches updated metadata and alerts me if changes are detected
+
+**Category:** should-have
+**Priority:** should-have
+
+### AC-10: Configuration backup before changes
+**Given** I modify existing SSO configuration
+**When** changes are saved
+**Then** the previous configuration is backed up and can be restored within 24 hours
+
+**Category:** edge-case
+**Priority:** should-have
+
+### AC-11: IdP service discovery failure
+**Given** I enter an OIDC issuer URL that is unreachable
+**When** discovery is attempted
+**Then** I receive error "Unable to connect to identity provider. Check URL and firewall settings."
+
+**Category:** error-handling
+**Priority:** must-have
+
+## Non-Functional Requirements
+
+### Error Handling
+| Scenario | Expected Behavior | Priority |
+|----------|------------------|----------|
+| Metadata file too large (>10MB) | Reject with clear size limit error | must-have |
+| XML parsing errors in metadata | Show specific line/error information | should-have |
+| Network timeout during test | Fail gracefully with retry option | must-have |
+
+### Performance
+- **Response time:** Configuration validation completes within 10 seconds
+- **Scale:** Support configuration for organizations with complex IdP setups
+
+### Security
+- **Input validation:** All uploaded files scanned for malicious content
+- **Authorization:** SSO configuration restricted to Organization Admins only
+- **Data protection:** Client secrets encrypted at rest
+- **Certificate validation:** All uploaded certificates validated for authenticity
+
+---
+
+# Acceptance Criteria: SSO-ADMIN-002 — SSO enforcement and user transition
+
+## Refined Story Statement
+As an Organization Admin, I want to enable SSO enforcement for my organization, so that all users must use corporate authentication instead of individual passwords and security is centrally controlled.
+
+## Assumptions
+- Password authentication is disabled when SSO enforced — **Confirmed**
+- Existing sessions remain valid during transition — **Unconfirmed**
+- Users are forced to re-authenticate immediately — **Confirmed**
+
+## Acceptance Criteria
+
+### AC-1: SSO enforcement activation
+**Given** I have working SSO configuration
+**When** I enable "Enforce SSO" and confirm the action
+**Then** password login is disabled for all organization users and only SSO login is available
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-2: Immediate password authentication blocking
+**Given** SSO enforcement is activated
+**When** any user tries to log in with email and password
+**Then** they receive message "Please use single sign-on to access your account" with SSO login button
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-3: Existing session forced re-authentication
+**Given** users have active sessions when SSO enforcement is enabled
+**When** they perform any action requiring authentication
+**Then** they are logged out with message "Your organization now requires single sign-on" and redirected to SSO login
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-4: User notification of SSO enforcement
+**Given** I enable SSO enforcement
+**When** the enforcement takes effect
+**Then** all organization users receive email notification explaining the change and how to log in with SSO
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-5: Admin access during SSO transition
+**Given** I am an Organization Admin enabling SSO enforcement
+**When** SSO enforcement is active but I don't have an SSO account yet
+**Then** I can still access admin functions for 24 hours to complete the transition
+
+**Category:** boundary
+**Priority:** must-have
+
+### AC-6: Password reset blocking under SSO enforcement
+**Given** SSO enforcement is active
+**When** a user attempts to reset their password
+**Then** they receive message "Password reset not available. Please use single sign-on to access your account."
+
+**Category:** edge-case
+**Priority:** must-have
+
+### AC-7: SSO enforcement rollback capability
+**Given** SSO enforcement is active and causing issues
+**When** I disable "Enforce SSO" with emergency justification
+**Then** password authentication is immediately restored for all users and rollback is logged
+
+**Category:** edge-case
+**Priority:** should-have
+
+### AC-8: New user onboarding under SSO enforcement
+**Given** SSO enforcement is active
+**When** a new user is added to the organization
+**Then** they can only authenticate via SSO and cannot set up a password
+
+**Category:** boundary
+**Priority:** must-have
+
+### AC-9: Multi-organization user SSO precedence
+**Given** a user belongs to multiple organizations and one enforces SSO
+**When** they attempt password login
+**Then** they are required to use SSO regardless of other organizations' settings
+
+**Category:** edge-case
+**Priority:** must-have
+
+### AC-10: SSO configuration failure with enforcement active
+**Given** SSO enforcement is active and SSO configuration becomes invalid
+**When** users attempt to authenticate
+**Then** they receive clear error message with admin contact information and enforcement is automatically disabled after 1 hour
+
+**Category:** error-handling
+**Priority:** must-have
+
+## Non-Functional Requirements
+
+### Error Handling
+| Scenario | Expected Behavior | Priority |
+|----------|------------------|----------|
+| Email notification service failure | Log failure but proceed with SSO enforcement | should-have |
+| Session invalidation errors | Continue with enforcement, log session cleanup issues | must-have |
+| Admin override timeout | Extend grace period with warning rather than hard lockout | should-have |
+
+### Performance
+- **Response time:** SSO enforcement activation completes within 30 seconds
+- **Scale:** Handle enforcement activation for organizations with 10,000 users
+
+### Security
+- **Input validation:** Enforcement change requires admin confirmation
+- **Authorization:** Only Organization Admins can modify SSO enforcement
+- **Audit logging:** All enforcement changes logged with justification
+- **Emergency access:** Admin override capability includes strong audit trail
+
+---
+
+# Acceptance Criteria: SSO-CORE-003 — SSO provider failure handling
+
+## Refined Story Statement
+As a System Admin, I want SSO-enabled organizations to be completely locked out when their identity provider fails, so that we maintain security integrity without creating password fallback vulnerabilities.
+
+## Assumptions
+- No password fallback is allowed during SSO provider failures — **Confirmed**
+- Provider health monitoring runs every 5 minutes — **Unconfirmed**
+- Complete lockout is intentional for security — **Confirmed**
+
+## Acceptance Criteria
+
+### AC-1: SSO provider health monitoring
+**Given** organizations have SSO configured
+**When** the health monitor runs every 5 minutes
+**Then** each SSO provider endpoint is checked for availability and response time
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-2: Provider failure detection and lockout
+**Given** an SSO provider fails health checks for 15 minutes (3 consecutive failures)
+**When** the failure threshold is reached
+**Then** all users from that organization are blocked from authentication with message "Identity provider temporarily unavailable"
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-3: Immediate user lockout on SSO failure
+**Given** an SSO provider failure has been detected
+**When** a user from that organization attempts to log in
+**Then** they receive error "Your organization's identity provider is unavailable. Please contact your IT department." with no password fallback option
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-4: Admin notification on provider failure
+**Given** an SSO provider failure is detected
+**When** lockout takes effect
+**Then** Organization Admins and System Admins receive immediate email alert with provider status and estimated resolution guidance
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-5: Status page update during outage
+**Given** an SSO provider failure causes organization lockout
+**When** the failure is confirmed
+**Then** the public status page shows "SSO authentication issues affecting some organizations" with timestamp and status updates
+
+**Category:** happy-path
+**Priority:** should-have
+
+### AC-6: Automatic recovery when provider restored
+**Given** an SSO provider has failed and organization is locked out
+**When** the provider passes 2 consecutive health checks
+**Then** user authentication is automatically restored and recovery notification is sent
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-7: Existing session preservation during provider failure
+**Given** users have active sessions when SSO provider fails
+**When** the provider failure is detected
+**Then** existing sessions remain valid until their natural expiration (no forced logout)
+
+**Category:** edge-case
+**Priority:** must-have
+
+### AC-8: Multiple SSO provider failure isolation
+**Given** multiple organizations use different SSO providers
+**When** one provider fails
+**Then** only that provider's organizations are locked out, others continue normal SSO authentication
+
+**Category:** boundary
+**Priority:** must-have
+
+### AC-9: False positive provider failure handling
+**Given** network issues cause temporary SSO provider connectivity problems
+**When** the provider becomes reachable again within the 15-minute threshold
+**Then** no lockout occurs and the incident is logged for monitoring
+
+**Category:** edge-case
+**Priority:** should-have
+
+### AC-10: Manual override for false provider failures
+**Given** System Admins determine provider failure detection was incorrect
+**When** manual override is activated
+**Then** organization lockout is immediately removed and override is audited with justification
+
+**Category:** boundary
+**Priority:** should-have
+
+### AC-11: Provider failure during active authentication
+**Given** a user initiates SSO authentication and provider fails mid-process
+**When** the authentication cannot complete
+**Then** user receives error "Authentication interrupted. Please try again." and can retry when provider recovers
+
+**Category:** error-handling
+**Priority:** must-have
+
+## Non-Functional Requirements
+
+### Error Handling
+| Scenario | Expected Behavior | Priority |
+|----------|------------------|----------|
+| Health monitoring service failure | Continue allowing SSO until service restored | must-have |
+| Notification service down | Log notification failures and retry every 15 minutes | should-have |
+| Status page update failure | Continue with lockout but log status update error | should-have |
+
+### Performance
+- **Response time:** Provider health checks complete within 10 seconds
+- **Scale:** Monitor up to 100 different SSO providers simultaneously
+
+### Security
+- **Input validation:** Provider health check responses validated for authenticity
+- **Authorization:** Manual overrides restricted to System Admins with audit trail
+- **Monitoring integrity:** Health check system isolated from general application to prevent cascading failures
+
+---
+
+# Acceptance Criteria: SSO-ADMIN-003 — Multi-organization user policy enforcement
+
+## Refined Story Statement
+As a System Admin, I want users who belong to multiple organizations to follow the most restrictive authentication policy across all their memberships, so that enterprise security requirements are enforced regardless of which organization context the user is operating in.
+
+## Assumptions
+- Most restrictive policy wins across all user's organizations — **Confirmed**
+- Policy evaluation happens at login time — **Confirmed**
+- Users cannot bypass restrictions by switching organization context — **Confirmed**
+
+## Acceptance Criteria
+
+### AC-1: Most restrictive MFA policy enforcement
+**Given** I belong to Organization A (MFA optional) and Organization B (MFA required)
+**When** I log in to access either organization
+**Then** I am required to complete MFA because Organization B enforces it
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-2: Most restrictive SSO policy enforcement
+**Given** I belong to Organization A (password allowed) and Organization B (SSO enforced)
+**When** I attempt password authentication
+**Then** I am required to use SSO because Organization B enforces it
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-3: Shortest session timeout enforcement
+**Given** I belong to Organization A (8-hour sessions) and Organization B (1-hour sessions)
+**When** I log in
+**Then** my session timeout is set to 1 hour (the most restrictive)
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-4: Policy evaluation across organization changes
+**Given** I start with membership in only Organization A (relaxed policies)
+**When** I am added to Organization B (strict policies)
+**Then** the stricter policies apply immediately on my next authentication
+
+**Category:** edge-case
+**Priority:** must-have
+
+### AC-5: Policy inheritance during session
+**Given** I have an active session with 1-hour timeout due to Organization B's policy
+**When** I am removed from Organization B but remain in Organization A (8-hour timeout)
+**Then** my current session continues with 1-hour timeout until expiration, but new sessions use 8-hour timeout
+
+**Category:** edge-case
+**Priority:** should-have
+
+### AC-6: Cross-organization audit trail
+**Given** I am subject to multiple organizations' policies
+**When** my authentication is governed by the most restrictive policy
+**Then** the audit log records which organization's policy was applied and why
+
+**Category:** happy-path
+**Priority:** should-have
+
+### AC-7: Organization admin visibility into cross-org effects
+**Given** I am an Organization Admin for Organization A
+**When** I view security policy impact
+**Then** I see warning "X users subject to stricter policies from other organizations" when applicable
+
+**Category:** happy-path
+**Priority:** should-have
+
+### AC-8: Policy conflict resolution for equal restrictions
+**Given** I belong to Organization A (2-hour timeout) and Organization B (2-hour timeout)
+**When** I log in
+**Then** either organization's policy applies (no preference needed for identical restrictions)
+
+**Category:** boundary
+**Priority:** should-have
+
+### AC-9: Emergency policy override across organizations
+**Given** I am a System Admin and need to override cross-organization policy enforcement
+**When** I activate emergency override for a specific user
+**Then** the user temporarily follows single organization policy with override logged
+
+**Category:** boundary
+**Priority:** should-have
+
+### AC-10: Single organization membership optimization
+**Given** I belong to only one organization
+**When** I authenticate
+**Then** policy evaluation is optimized to skip cross-organization checks
+
+**Category:** edge-case
+**Priority:** should-have
+
+### AC-11: Policy calculation service failure
+**Given** the cross-organization policy service is unavailable
+**When** I attempt to log in
+**Then** authentication falls back to the most restrictive default policies (MFA required, SSO required, 15-minute timeout)
+
+**Category:** error-handling
+**Priority:** must-have
+
+## Non-Functional Requirements
+
+### Error Handling
+| Scenario | Expected Behavior | Priority |
+|----------|------------------|----------|
+| Organization membership data inconsistency | Apply most restrictive default until resolved | must-have |
+| Policy calculation timeout | Default to strictest policy rather than blocking authentication | must-have |
+| Circular organization dependencies | Detect and break cycles with error logging | should-have |
+
+### Performance
+- **Response time:** Cross-organization policy evaluation adds < 200ms to login
+- **Scale:** Support users with membership in up to 20 organizations
+
+### Security
+- **Input validation:** Organization membership data validated for consistency
+- **Authorization:** Policy overrides require System Admin privileges
+- **Policy integrity:** Cross-organization policy calculation isolated and tamper-resistant
+- **Audit completeness:** All policy decisions logged with full context
+
+---
+
+# Acceptance Criteria: SYS-ADMIN-001 — Admin MFA mandate enforcement
+
+## Refined Story Statement
+As a System Admin, I want all Organization Admins and System Admins to be required to use MFA by Q3 2026, so that privileged accounts are protected according to our security policy and compliance requirements.
+
+## Assumptions
+- Q3 2026 means September 30, 2026 deadline — **Confirmed**
+- Enforcement applies to both Organization Admins and System Admins — **Confirmed**
+- Non-compliant admins are locked out of admin functions — **Confirmed**
+
+## Acceptance Criteria
+
+### AC-1: Admin role MFA requirement detection
+**Given** I am an Organization Admin or System Admin without MFA enabled
+**When** I log in after the policy takes effect
+**Then** I see urgent banner "Admin MFA required by Q3 2026" with setup link and countdown timer
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-2: Admin lockout after Q3 2026 deadline
+**Given** I am an Organization Admin without MFA and the deadline has passed
+**When** I attempt to access admin functions
+**Then** I am blocked with message "MFA required for admin access" and redirected to MFA setup
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-3: Compliant admin unaffected by mandate
+**Given** I am a System Admin with MFA already enabled
+**When** the admin MFA mandate is enforced
+**Then** I experience normal admin access without additional prompts or restrictions
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-4: Exception tracking for delayed compliance
+**Given** an Organization Admin cannot enable MFA due to technical issues
+**When** a System Admin grants a temporary exception
+**Then** the exception is logged with expiration date and justification, extending the deadline by maximum 30 days
+
+**Category:** boundary
+**Priority:** should-have
+
+### AC-5: New admin immediate MFA requirement
+**Given** a user is promoted to Organization Admin role after Q3 2026
+**When** they first access admin functions
+**Then** they must complete MFA setup before gaining admin access
+
+**Category:** boundary
+**Priority:** must-have
+
+### AC-6: Admin role downgrade option
+**Given** an Organization Admin refuses to enable MFA after the deadline
+**When** they are locked out of admin functions
+**Then** they can choose to downgrade to regular user access to continue using the platform
+
+**Category:** edge-case
+**Priority:** should-have
+
+### AC-7: System Admin compliance monitoring
+**Given** the admin MFA mandate is active
+**When** System Admins view the compliance dashboard
+**Then** they see "Admin MFA Compliance: 85% (34/40 admins)" with list of non-compliant accounts
+
+**Category:** happy-path
+**Priority:** should-have
+
+### AC-8: Bulk admin notification before deadline
+**Given** Q3 2026 deadline is 30 days away
+**When** the notification system runs
+**Then** all non-compliant admins receive email "Admin MFA required in 30 days" with setup instructions
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-9: Emergency admin access during MFA setup issues
+**Given** MFA services are temporarily unavailable and admin needs emergency access
+**When** a System Admin provides emergency override
+**Then** admin access is granted for 24 hours with full audit logging
+
+**Category:** edge-case
+**Priority:** should-have
+
+### AC-10: Cross-organization admin MFA consistency
+**Given** I am an Organization Admin for multiple organizations
+**When** I enable MFA to comply with the mandate
+**Then** my MFA requirement is satisfied across all my admin roles
+
+**Category:** edge-case
+**Priority:** must-have
+
+### AC-11: Admin MFA enforcement service failure
+**Given** the admin MFA enforcement system fails
+**When** admins attempt to access admin functions
+**Then** access is allowed with warning "MFA enforcement temporarily disabled" and failure is logged
+
+**Category:** error-handling
+**Priority:** must-have
+
+## Non-Functional Requirements
+
+### Error Handling
+| Scenario | Expected Behavior | Priority |
+|----------|------------------|----------|
+| Exception database unavailable | Default to enforcing MFA without exceptions | must-have |
+| Compliance dashboard data inconsistency | Show warning and last known good data | should-have |
+| Deadline calculation error | Default to immediate enforcement rather than delayed | must-have |
+
+### Performance
+- **Response time:** Admin MFA check adds < 50ms to admin function access
+- **Scale:** Support MFA enforcement for up to 1,000 admin users
+
+### Security
+- **Input validation:** Exception requests validated against security policy
+- **Authorization:** Only System Admins can grant MFA exceptions
+- **Audit completeness:** All admin access attempts logged with MFA status
+- **Exception limits:** Maximum 3 exceptions per admin, maximum 30 day extension
+
+---
+
+# Acceptance Criteria: SYS-ADMIN-002 — System Admin SSO override capability
+
+## Refined Story Statement
+As a System Admin, I want to override organization SSO configurations for support scenarios, so that I can assist customers during identity provider outages or misconfigurations without compromising security.
+
+## Assumptions
+- Overrides are temporary with 24-hour maximum duration — **Confirmed**
+- Overrides apply to specific users, not entire organizations — **Confirmed**
+- All override actions are fully audited — **Confirmed**
+
+## Acceptance Criteria
+
+### AC-1: User-specific SSO bypass creation
+**Given** I am a System Admin and an organization is locked out due to SSO provider failure
+**When** I create an SSO bypass for specific user "user@company.com" with 24-hour duration
+**Then** that user can temporarily log in with password despite SSO enforcement
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-2: SSO bypass duration limits
+**Given** I am creating an SSO bypass for a user
+**When** I set the duration
+**Then** the system enforces a maximum of 24 hours and requires justification for bypasses longer than 8 hours
+
+**Category:** boundary
+**Priority:** must-have
+
+### AC-3: Automatic bypass expiration
+**Given** an SSO bypass is set to expire at 2:00 PM today
+**When** the expiration time is reached
+**Then** the bypass is automatically removed and the user returns to normal SSO enforcement
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-4: Bypass audit logging with justification
+**Given** I create an SSO bypass for a user
+**When** the bypass is activated
+**Then** a detailed audit log is created including: my admin ID, target user, duration, justification, and timestamp
+
+**Category:** happy-path
+**Priority:** must-have
+
+### AC-5: Limited bypass scope validation
+**Given** I create an SSO bypass for "user@company.com"
+**When** the bypass is active
+**Then** only that specific user can use password authentication, other organization users remain under SSO enforcement
+
+**Category:** boundary
+**Priority:** must-have
+
+### AC-6: Concurrent bypass limitation
+**Given** I have created an SSO bypass for a user
+**When** I attempt to create another bypass for the same user
+**Then** I receive warning "Active bypass exists. Extend current bypass?" rather than creating duplicate bypasses
+
+**Category:** edge-case
+**Priority:** should-have
+
+### AC-7: Bypass extension capability
+**Given** I have an active 8-hour SSO bypass that needs extension
+**When** I extend the bypass for another 16 hours
+**Then** the total duration cannot exceed 24 hours and extension is logged with additional justification
+
+**Category:** edge-case
+**Priority:** should-have
+
+### AC-8: Organization Admin notification of bypasses
+**Given** I create an SSO bypass for a user in Organization A
+**When** the bypass is activated
+**Then** Organization A's admins receive notification "Temporary SSO bypass granted for [user] by System Admin"
+
+**Category:** happy-path
+**Priority:** should-have
+
+### AC-9: Bypass revocation capability
+**Given** I have granted an SSO bypass that is no longer needed
+**When** I manually revoke the bypass before expiration
+**Then** the bypass is immediately removed and revocation is logged with justification
+
+**Category:** edge-case
+**Priority:** should-have
+
+### AC-10: Invalid user bypass prevention
+**Given** I attempt to create an SSO bypass for a non-existent user
+**When** I submit the bypass request
+**Then** I receive error "User not found" and no bypass is created
+
+**Category:** boundary
+**Priority:** must-have
+
+### AC-11: Bypass system failure handling
+**Given** the SSO bypass system is unavailable
+**When** I attempt to create emergency bypasses
+**Then** I receive error "Override system unavailable. Contact emergency support." and incident is escalated
+
+**Category:** error-handling
+**Priority:** must-have
+
+## Non-Functional Requirements
+
+### Error Handling
+| Scenario | Expected Behavior | Priority |
+|----------|------------------|----------|
+| Bypass database corruption | Fail secure by maintaining SSO enforcement | must-have |
+| Audit logging failure | Prevent bypass creation if auditing unavailable | must-have |
+| Notification delivery failure | Proceed with bypass but retry notifications | should-have |
+
+### Performance
+- **Response time:** SSO bypass creation completes within 5 seconds
+- **Scale:** Support up to 50 active bypasses simultaneously
+
+### Security
+- **Input validation:** All bypass parameters validated against security policy
+- **Authorization:** SSO override capability restricted to System Admins only
+- **Audit integrity:** Bypass audit logs tamper-resistant and immediately persisted
+- **Justification requirements:** All bypasses require documented business justification
+
+---
+
+## Summary
+
+I have written complete acceptance criteria for all 22 user stories across 6 features:
+
+**Authentication Rate Limiting (3 stories)**
+- Password, IP, and SSO-specific rate limiting with different thresholds
+
+**Authentication Audit Logging (3 stories)**  
+- Comprehensive event logging, access controls, and retention management
+
+**Multi-Factor Authentication (6 stories)**
+- TOTP, SMS, backup codes, login flow, organization enforcement, and cost management
+
+**Session Management (2 stories)**
+- Configurable timeouts and user-friendly warning system
+
+**SSO Integration (6 stories)**
+- SAML 2.0, OpenID Connect, configuration management, enforcement, failure handling, and cross-organization policies
+
+**System Administration (2 stories)**
+- Admin MFA mandates and emergency SSO overrides
+
+Each story includes:
+- Refined story statements with specific business value
+- Comprehensive Given/When/Then acceptance criteria covering happy path, edge cases, and error conditions
+- Detailed non-functional requirements for performance, security, and accessibility
+- Proper error handling specifications
+- Security considerations throughout
+
+The acceptance criteria are fully testable and provide clear guidance for implementation teams while maintaining traceability to business requirements.

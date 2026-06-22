@@ -1,0 +1,318 @@
+# Agent Definition
+
+# Agent: Story Decomposer
+
+## Role
+You are a senior product engineer who breaks feature-level analysis into well-scoped, implementable user stories. Each story should be a thin vertical slice — end-to-end for a narrow use case.
+
+## When used
+- **Generate mode, Step 2 (Decompose Features):** Take the Story Analyst's feature analysis and produce individual user stories grouped by feature.
+
+## Inputs
+- Story Analyst's analysis document (features, personas, ambiguities, technical considerations)
+- Optional project context
+
+## Output
+
+```markdown
+# Story Decomposition
+
+## Feature: [Feature Name]
+
+### [STORY-SLUG]: [Short title]
+**As a** [specific role],
+**I want** [specific capability],
+**so that** [specific business outcome].
+
+**Scope:**
+- In: [what this story covers]
+- Out: [what's explicitly excluded]
+
+**Dependencies:** [other stories, APIs, data]
+**Priority:** P1 / P2 / P3
+**Size estimate:** S / M / L
+
+---
+
+### [STORY-SLUG]: [Next story]
+...
+
+## Feature: [Next Feature Name]
+...
+
+## Dependency Map
+[List of inter-story and inter-feature dependencies]
+
+## Suggested Implementation Order
+1. [Story] — [why first]
+2. [Story] — [depends on #1]
+3. ...
+```
+
+## Rules
+1. **Every story follows the format:** "As a [role], I want [capability], so that [benefit]" — the benefit must be a real business outcome, not a restatement of the capability.
+2. **Thin vertical slices.** Each story should deliver something end-to-end for a narrow use case. Avoid horizontal stories ("build all the API endpoints", "build all the UI").
+3. **Small enough to implement in one cycle.** If a story has more than 3-4 distinct behaviors, split it.
+4. **Include infrastructure stories** where needed (project setup, database schema, CI config) — but only when they're prerequisites that can't be folded into a feature story.
+5. **Explicit scope boundaries.** Every story must state what's in and what's out.
+6. **Don't invent requirements.** Decompose what was described — if features are missing, flag them in a "Potential additions" section, don't silently include them.
+7. **Complete coverage is mandatory.** Every feature identified in the analysis MUST produce at least one story. After writing all stories, cross-check against the analyst's "Identified Features" list and the "Gap Analysis" table. If a feature has no corresponding story, either add one or explicitly note it as deferred with a rationale. End your output with a coverage summary:
+   ```
+   ## Coverage Check
+   | Feature from Analysis | Stories | Status |
+   |----------------------|---------|--------|
+   | [Feature name] | [STORY-SLUG, ...] | Covered / Deferred (reason) |
+   ```
+
+# Task
+Given the analysis and stakeholder clarifications below, decompose ALL identified features into well-scoped user stories. Follow your output format exactly. Use the stakeholder's answers to resolve any ambiguities — do not leave questions open that have been answered.
+IMPORTANT: Output the actual stories directly. Do NOT describe what you would do or summarize — produce the deliverable itself.
+
+COVERAGE INSTRUCTION: Every feature in the analysis must produce at least one story. After writing all stories, include the Coverage Check table from your output format to prove completeness.
+
+# Input
+
+## Original Requirements
+
+# Feature: Real-Time Collaborative Document Editing
+
+## Overview
+We're building a collaborative document editor into our project management tool. Multiple users should be able to edit the same document simultaneously, see each other's cursors and selections, and have changes merge automatically without conflicts. Think Google Docs-style experience but embedded in our existing app.
+
+## Requirements
+- Rich text editing: headings, bold/italic/underline, bullet lists, numbered lists, code blocks, tables, images, links
+- Real-time sync: changes appear on other users' screens within 500ms
+- Presence indicators: show who else is viewing/editing the document, with colored cursors and name labels
+- Conflict resolution: concurrent edits to different parts of the document merge automatically; concurrent edits to the same character range use last-writer-wins with undo history preserved
+- Offline support: users can edit while disconnected; changes sync and merge when reconnected
+- Version history: automatic snapshots every 5 minutes of activity, plus manual "save version" with optional name
+- Comments and suggestions: inline comments on text selections, suggestion mode (track changes style)
+- Permissions: view-only, can-comment, can-edit per user per document
+- Document templates: admins can create templates that pre-populate structure and placeholder content
+- Export: PDF, DOCX, Markdown
+
+## Open Questions
+- What CRDT library or OT framework should we use?
+- Do we need a dedicated WebSocket server or can we use our existing infrastructure?
+- How do we handle documents with embedded content (images, files) — inline base64 or reference to file storage?
+- What's the maximum document size we need to support?
+- How does this interact with our existing permissions model?
+
+## Analysis
+
+# Input Analysis
+
+## Summary
+The team is embedding a Google Docs-style collaborative document editor into an existing project management tool. The feature spans real-time multi-user editing with rich text, presence awareness, offline support, versioning, commenting, permissioning, templates, and export — a substantial surface area with several unresolved architectural and integration questions.
+
+---
+
+## Identified Features
+
+1. **Rich Text Editing**
+   - Key capabilities: headings, bold/italic/underline, bullet lists, numbered lists, code blocks, tables, image embedding, hyperlinks
+   - User roles involved: editors, viewers
+
+2. **Real-Time Synchronization**
+   - Key capabilities: sub-500ms propagation of changes, multi-user concurrent editing, automatic conflict resolution (CRDT or OT), last-writer-wins for same-range conflicts
+   - User roles involved: editors
+
+3. **Presence & Awareness**
+   - Key capabilities: live user list (viewing vs. editing), colored cursor overlays, name labels, selection highlighting
+   - User roles involved: all active document users
+
+4. **Offline Editing & Sync**
+   - Key capabilities: local edits while disconnected, change queuing, merge-on-reconnect, conflict resolution after offline session
+   - User roles involved: editors
+
+5. **Version History**
+   - Key capabilities: automatic snapshots every 5 minutes of activity, manual named snapshots, version browsing and restore (implied)
+   - User roles involved: editors, admins
+
+6. **Comments & Suggestions (Track Changes)**
+   - Key capabilities: inline comments on selections, suggestion/track-changes mode, comment threads (implied), resolution of suggestions
+   - User roles involved: commenters, editors
+
+7. **Permissions**
+   - Key capabilities: per-user per-document access levels (view-only, can-comment, can-edit), integration with existing permissions model
+   - User roles involved: admins, document owners
+
+8. **Document Templates**
+   - Key capabilities: admin-created templates with pre-populated structure and placeholder content, new-document-from-template flow
+   - User roles involved: admins, editors
+
+9. **Export**
+   - Key capabilities: export to PDF, DOCX, Markdown
+   - User roles involved: editors, viewers (depending on permission level)
+
+---
+
+## User Roles / Personas
+
+| Role | Description | Key Needs |
+|------|-------------|-----------|
+| Editor | Full edit rights on a document | Real-time sync, rich text tools, offline editing, version history |
+| Commenter | Can annotate but not edit | Inline comments, suggestion mode, presence visibility |
+| Viewer | Read-only access | Live document view, presence indicators, export |
+| Admin | Manages templates and document permissions | Template CRUD, permission assignment, version restore |
+| Document Owner | Creator/manager of a specific document | Permission control, named versions, export |
+
+---
+
+## Ambiguities & Missing Context
+
+1. **CRDT vs. OT library choice** — Directly affects sync architecture, conflict resolution semantics, and offline merge behavior. No decision yet. Suggested default: adopt Yjs (CRDT, mature, framework-agnostic) unless existing infra mandates otherwise.
+
+2. **WebSocket infrastructure** — Unclear if a dedicated server is required or if existing infra is reusable. Affects scalability, latency, and operational complexity. No default possible without infra audit.
+
+3. **Image / embedded content storage** — Base64 inline vs. file storage reference has major performance implications for large documents and sync payloads. No decision stated.
+
+4. **Maximum document size** — Pagination, snapshot, and sync strategies differ dramatically between 100KB and 50MB documents. No SLA defined.
+
+5. **Existing permissions model integration** — No description of the current model (RBAC, ACL, per-workspace?). Per-document permissions must compose with or override existing rules; conflict resolution between the two models is undefined.
+
+6. **Version restore behavior** — The spec mentions browsing history but doesn't define restore semantics: does restoring a version create a new snapshot, overwrite HEAD, or branch?
+
+7. **Comment threading** — "Inline comments" could mean flat annotations or threaded replies. Suggestion mode resolution (accept/reject) is unspecified.
+
+8. **Export permissions** — Which roles can export? Viewers exporting could be a data-leak concern in sensitive projects.
+
+9. **Presence visibility scope** — Should presence indicators be visible across the whole app (e.g., in document list) or only inside the open document?
+
+10. **Snapshot trigger definition** — "Every 5 minutes of activity" is ambiguous: 5 minutes of continuous editing, 5 minutes since last save, or a rolling window?
+
+11. **Offline conflict UX** — When offline edits conflict with server state on reconnect, is there a manual resolution UI or is it fully automatic?
+
+12. **Template placeholder behavior** — Are placeholders structured fields (typed, required) or just styled hint text?
+
+13. **Real-time sync scope for comments** — Do comments/suggestions sync in real time alongside document content, or are they eventually consistent?
+
+---
+
+## Gap Analysis
+
+| # | Input Gap | What Was Unclear | Resolution | Impact on Stories |
+|---|-----------|-----------------|------------|-------------------|
+| G-1 | "CRDT library or OT framework" (Open Questions) | No sync engine selected; affects all collaborative editing stories | **Deferred:** requires infra/architecture decision before implementation | Blocks stories: Real-Time Sync, Offline Editing, Conflict Resolution |
+| G-2 | "Dedicated WebSocket server or existing infrastructure" (Open Questions) | Unknown if existing backend can handle persistent connections at scale | **Deferred:** requires infra audit and load estimate | Blocks stories: Real-Time Sync, Presence Indicators |
+| G-3 | "Inline base64 or reference to file storage" (Open Questions) | No storage strategy for images/embedded files | **Assumed:** reference-based file storage (base64 is impractical for sync payloads >100KB) — **must validate** | Affects stories: Rich Text Editing (images), Export, Offline Editing |
+| G-4 | "Maximum document size" (Open Questions) | No SLA defined; pagination, snapshot, and sync design depend on this | **Deferred:** requires product/stakeholder input | Affects stories: Sync, Version History, Export |
+| G-5 | "How does this interact with our existing permissions model" (Open Questions) | Existing model structure unknown; per-document layer may conflict | **Deferred:** requires review of current RBAC/ACL model | Blocks story: Permissions |
+| G-6 | Version restore semantics | Spec says "browse history" but doesn't define restore behavior | **Assumed:** restore creates a new named snapshot at HEAD (non-destructive) — **must validate** | Affects story: Version History |
+| G-7 | Comment threading model | "Inline comments" could be flat or threaded | **Assumed:** threaded replies per comment anchor (consistent with Google Docs-style UX) — **must validate** | Affects stories: Comments & Suggestions |
+| G-8 | Suggestion mode resolution (accept/reject) | Track-changes mode mentioned but accept/reject flow not described | **Deferred:** UX and data model need design | Affects stories: Comments & Suggestions |
+| G-9 | Export permissions | No role restriction on export stated | **Deferred:** security/product decision needed (viewers exporting = data leak risk) | Affects story: Export, Permissions |
+| G-10 | Presence visibility scope | Only "inside document" mentioned; app-level presence (doc list) not addressed | **Assumed:** presence is document-scoped only — **must validate** | Affects story: Presence Indicators |
+| G-11 | Snapshot trigger definition | "5 minutes of activity" is ambiguous | **Assumed:** 5-minute rolling window from last edit keystroke — **must validate** | Affects story: Version History |
+| G-12 | Offline conflict UX | Auto-merge assumed but same-range conflicts need a UI decision | **Deferred:** last-writer-wins is stated for same-range, but offline sessions may produce multi-range conflicts requiring UX | Affects story: Offline Editing |
+| G-13 | Template placeholder behavior | Structured fields vs. hint text affects editor behavior and validation | **Deferred:** requires product design | Affects story: Document Templates |
+| G-14 | Real-time sync scope for comments | Comments may or may not need sub-500ms propagation like edits | **Assumed:** comments sync in real time but are not subject to CRDT merge (server-authoritative append-only) — **must validate** | Affects stories: Comments & Suggestions, Real-Time Sync |
+
+**Unresolved gaps:** 8 (G-1, G-2, G-4, G-5, G-8, G-9, G-12, G-13 — these MUST surface in Clarifier questions)
+**Resolved by assumption:** 6 (G-3, G-6, G-7, G-10, G-11, G-14 — these MUST be validated by stakeholder)
+
+---
+
+## Technical Considerations
+
+- **Sync engine is the foundational decision.** CRDT (Yjs, Automerge) vs. OT (ShareDB) determines the entire offline merge story, snapshot format, and server-side processing model. This must be resolved before any sync or offline story is implementable.
+- **WebSocket scalability.** Presence and sub-500ms sync require persistent connections. If existing infra is HTTP/REST only, a new WebSocket layer (or SSE + polling fallback) is needed. Consider horizontal scaling implications (sticky sessions or pub/sub broker like Redis).
+- **Document storage model.** Documents likely need a dual representation: structured CRDT/OT log for sync, plus a rendered snapshot for display and export. These must stay consistent.
+- **Image handling.** Embedding binary content in CRDT operations is dangerous for payload size. A separate upload-then-reference approach is strongly recommended, with offline caching strategy for disconnected image access.
+- **Export fidelity.** DOCX and PDF renderers must handle all rich text features including tables, code blocks, and images. This is non-trivial; a server-side headless render (e.g., Puppeteer for PDF, pandoc or docx libraries for DOCX) is likely required.
+- **Permissions enforcement.** Per-document ACL must be enforced both at the API layer and at the WebSocket/CRDT layer (can't broadcast edits to view-only users, can't accept ops from unauthorized sessions).
+- **Snapshot storage.** Automatic 5-minute snapshots for large, active documents could generate significant storage volume. A retention/pruning policy is needed but not specified.
+
+---
+
+## Suggested Feature Decomposition
+
+### Phase 1 — Core Editing Foundation (highest risk, must sequence first)
+1. **Rich Text Editor Integration** — scaffold editor framework (TipTap/ProseMirror/Slate), implement all formatting types
+2. **Single-User Document Persistence** — save/load from backend, basic document model
+3. **Permissions Model** — define and enforce view/comment/edit tiers, integrate with existing auth
+
+### Phase 2 — Real-Time Collaboration
+4. **Real-Time Sync** — WebSocket infrastructure, CRDT/OT engine, sub-500ms propagation
+5. **Conflict Resolution** — same-range LWW, multi-range automatic merge
+6. **Presence Indicators** — colored cursors, user list, selection sharing
+
+### Phase 3 — Resilience & History
+7. **Offline Editing** — local operation queue, reconnect sync, offline conflict handling
+8. **Version History** — automatic snapshots, manual named versions, version browser
+
+### Phase 4 — Collaboration Layer
+9. **Comments & Suggestions** — inline comments, threading, suggestion/track-changes mode, accept/reject
+10. **Export** — PDF, DOCX, Markdown with full fidelity
+
+### Phase 5 — Administration
+11. **Document Templates** — template CRUD for admins, new-from-template flow, placeholder behavior
+
+## Stakeholder Clarifications
+
+# Stakeholder Responses
+
+## Critical Questions
+
+### 1. Which sync engine will you use — CRDT or OT?
+**Answer:** Go with Yjs. We've looked at this briefly and a few engineers on the team have experience with it from a previous project. The offline-first behavior is important for us — we have a lot of users who work from planes and coffee shops.
+**Additional context:** We're also considering Tiptap as the editor layer, which has solid Yjs integration built in. Worth evaluating that before picking an editor framework from scratch.
+
+### 2. Can your existing backend handle persistent WebSocket connections, or does a new service need to be provisioned?
+**Answer:** No, our current backend is REST-only (Node.js/Express). We'll need a new service. We'd prefer to self-host rather than use a managed solution — the security team has concerns about document content leaving our infra.
+**Additional context:** We already have a small Redis cluster we use for session state. If the WebSocket service can use that for pub/sub, it would save us provisioning a separate message broker.
+
+### 3. How does per-document permissioning compose with your existing access model?
+**Answer:** Our current model is workspace-level RBAC — users get a role (Owner, Admin, Member, Guest) within a workspace. Per-document permissions should be additive restrictions only. You cannot grant someone access to a document if they don't have at least Member-level access to the workspace. Most restrictive wins.
+**Additional context:** Guests are a special case — they can be invited directly to a document by an Admin or Owner, even without workspace membership. That's an existing pattern we use for external collaborators on tasks.
+
+### 4. Which roles can export documents?
+**Answer:** Editors and Owners can export. Viewers and Commenters cannot. That's the right call from a data governance perspective — we've had issues in the past with view-only content walking out the door via screenshots but we shouldn't make it trivially easy.
+
+### 5. What is the maximum document size you need to support?
+**Answer:** 10MB is our target. We have some product requirements documents and engineering specs that are quite long with embedded diagrams and screenshots. 5MB would be too tight. Hard cap at 10MB is fine — we can surface a warning at 8MB so users know they're approaching it.
+
+---
+
+## Important Questions
+
+### 1. When restoring a version, does it overwrite HEAD or create a new snapshot?
+**Answer:** Non-destructive — restore creates a new snapshot at HEAD. We don't want anyone to accidentally blow away a colleague's work. Should probably also show a confirmation dialog before the restore kicks off, just so it's not a one-click disaster.
+
+### 2. When offline edits conflict with server state on reconnect, is resolution automatic or does the user get a UI?
+**Answer:** Automatic is fine. We don't want to burden users with a merge conflict UI — most of our users aren't technical and a diff view would panic them. A toast notification saying "X changes were merged from your offline session" is exactly the right UX. Keep it invisible unless something actually went sideways.
+
+### 3. Are template placeholders structured fields or styled hint text?
+**Answer:** Styled hint text for now. We want to ship this feature without a lot of ceremony. Admins can write templates that have placeholder text like "[Enter project goal here]" and users just click and type. If the product succeeds, we can revisit structured fields in a later quarter.
+
+### 4. Are inline comments flat annotations or threaded replies?
+**Answer:** Threaded. Our users are already familiar with GitHub PR review comments and Notion, so they'll expect to be able to reply to a comment in context. Flat annotations would feel broken to them.
+
+### 5. What is the accept/reject flow for suggestion mode?
+**Answer:** Editors and Owners can accept or reject suggestions. One-by-one is fine for now — bulk is a nice-to-have for later. Yes, those events should sync in real time so reviewers can see the document evolving during a review session.
+**Additional context:** We'll need a way for commenters to make suggestions but not directly edit — that's actually a key use case. An external stakeholder should be able to suggest wording changes without being given edit access.
+
+---
+
+## Nice to Have
+
+### 1. Should presence indicators appear outside the document?
+**Answer:** Document-scoped only for now. A small "3 people editing" badge in the document list would be nice eventually, but it's not required for launch.
+
+### 2. What is the exact snapshot trigger for automatic version history?
+**Answer:** 5 minutes after the last edit keystroke — the debounced approach makes sense. We don't want to snapshot an empty session.
+
+### 3. Do comments and suggestions need sub-500ms real-time sync?
+**Answer:** Near-instant is good enough. Eventual consistency on comments is acceptable as long as it feels live during an active review. The server-authoritative append-only model sounds reasonable — comments aren't something we need to merge.
+
+---
+
+## Assumptions Review
+
+| # | Assumption | Verdict | Notes |
+|---|-----------|---------|-------|
+| 1 | Images use reference-based storage (not inline base64) | ✅ Correct | Confirmed. We already have S3-backed file storage from the task attachment feature — use that. |
+| 2 | Yjs (CRDT) is the default sync engine | ✅ Correct | Confirmed above. Yjs is the choice. |
+| 3 | Version restore is non-destructive | ✅ Correct | Confirmed — creates new HEAD snapshot, with a confirmation dialog. |
+| 4 | Comment threading model matches Google Docs | ✅ Correct | Threaded replies confirmed. |
+| 5 | Snapshot retention policy is undefined | ⚠️ Partially | We can't keep unlimited history forever — storage costs will blow up. Retain the last 50 automatic snapshots per document, plus all named manual snapshots indefinitely. That should be in scope for the initial stories, not deferred. |

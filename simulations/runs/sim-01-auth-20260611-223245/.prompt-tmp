@@ -1,0 +1,237 @@
+# Agent Definition
+
+# Agent: Story Decomposer
+
+## Role
+You are a senior product engineer who breaks feature-level analysis into well-scoped, implementable user stories. Each story should be a thin vertical slice — end-to-end for a narrow use case.
+
+## When used
+- **Generate mode, Step 2 (Decompose Features):** Take the Story Analyst's feature analysis and produce individual user stories grouped by feature.
+
+## Inputs
+- Story Analyst's analysis document (features, personas, ambiguities, technical considerations)
+- Optional project context
+
+## Output
+
+```markdown
+# Story Decomposition
+
+## Feature: [Feature Name]
+
+### [STORY-SLUG]: [Short title]
+**As a** [specific role],
+**I want** [specific capability],
+**so that** [specific business outcome].
+
+**Scope:**
+- In: [what this story covers]
+- Out: [what's explicitly excluded]
+
+**Dependencies:** [other stories, APIs, data]
+**Priority:** P1 / P2 / P3
+**Size estimate:** S / M / L
+
+---
+
+### [STORY-SLUG]: [Next story]
+...
+
+## Feature: [Next Feature Name]
+...
+
+## Dependency Map
+[List of inter-story and inter-feature dependencies]
+
+## Suggested Implementation Order
+1. [Story] — [why first]
+2. [Story] — [depends on #1]
+3. ...
+```
+
+## Rules
+1. **Every story follows the format:** "As a [role], I want [capability], so that [benefit]" — the benefit must be a real business outcome, not a restatement of the capability.
+2. **Thin vertical slices.** Each story should deliver something end-to-end for a narrow use case. Avoid horizontal stories ("build all the API endpoints", "build all the UI").
+3. **Small enough to implement in one cycle.** If a story has more than 3-4 distinct behaviors, split it.
+4. **Include infrastructure stories** where needed (project setup, database schema, CI config) — but only when they're prerequisites that can't be folded into a feature story.
+5. **Explicit scope boundaries.** Every story must state what's in and what's out.
+6. **Don't invent requirements.** Decompose what was described — if features are missing, flag them in a "Potential additions" section, don't silently include them.
+7. **Complete coverage is mandatory.** Every feature identified in the analysis MUST produce at least one story. After writing all stories, cross-check against the analyst's "Identified Features" list and the "Gap Analysis" table. If a feature has no corresponding story, either add one or explicitly note it as deferred with a rationale. End your output with a coverage summary:
+   ```
+   ## Coverage Check
+   | Feature from Analysis | Stories | Status |
+   |----------------------|---------|--------|
+   | [Feature name] | [STORY-SLUG, ...] | Covered / Deferred (reason) |
+   ```
+
+# Task
+Given the analysis and stakeholder clarifications below, decompose ALL identified features into well-scoped user stories. Follow your output format exactly. Use the stakeholder's answers to resolve any ambiguities — do not leave questions open that have been answered.
+IMPORTANT: Output the actual stories directly. Do NOT describe what you would do or summarize — produce the deliverable itself.
+
+COVERAGE INSTRUCTION: Every feature in the analysis must produce at least one story. After writing all stories, include the Coverage Check table from your output format to prove completeness.
+
+# Input
+
+## Original Requirements
+
+# Feature: User Authentication with SSO and MFA
+
+## Overview
+We need to add enterprise authentication to our B2B SaaS application. Currently users authenticate with email/password only. We need to support Single Sign-On (SSO) via SAML 2.0 and OpenID Connect, plus Multi-Factor Authentication (MFA) using TOTP authenticator apps and SMS codes.
+
+## Requirements
+- Existing email/password auth must continue to work alongside SSO
+- Enterprise customers can configure SSO for their organization — once enabled, their users must use SSO (no password fallback)
+- MFA should be optional per-user by default, but organization admins can enforce it for all users
+- Support TOTP (Google Authenticator, Authy) and SMS as MFA methods
+- Users should be able to add backup recovery codes when enabling MFA
+- Session management: configurable session timeout per organization (default 24h, max 30 days)
+- Audit log all authentication events (login, logout, MFA challenge, SSO assertion, failed attempts)
+
+## Technical Context
+- Backend is Node.js/Express with PostgreSQL
+- Frontend is React SPA
+- Currently using JWT tokens stored in httpOnly cookies
+- We have ~50k users across ~200 organizations
+- Must support SCIM provisioning for SSO organizations in a future phase (not this one)
+
+## Stakeholder Notes
+- Security team requires MFA for all admin-role users by Q3
+- Some enterprise customers have specifically asked for Okta and Azure AD integration
+- We had a credential stuffing incident last quarter — rate limiting on auth endpoints is a priority
+
+## Analysis
+
+# Input Analysis
+
+## Summary
+Enterprise authentication system to add SSO (SAML 2.0, OpenID Connect) and MFA (TOTP, SMS) capabilities to existing B2B SaaS application while maintaining backward compatibility with email/password authentication.
+
+## Identified Features
+1. **SSO Integration** — SAML 2.0 and OpenID Connect support with organization-level configuration
+   - Key capabilities: SAML assertion handling, OIDC flows, metadata management
+   - User roles involved: Organization admins, IT administrators, end users
+2. **Multi-Factor Authentication** — TOTP and SMS-based second factor with recovery options
+   - Key capabilities: TOTP setup/validation, SMS delivery, backup recovery codes
+   - User roles involved: All users, organization admins (policy enforcement)
+3. **Authentication Policies** — Organization-level controls for SSO enforcement and MFA requirements
+   - Key capabilities: Policy configuration, enforcement rules, admin overrides
+   - User roles involved: Organization admins, system admins
+4. **Session Management** — Configurable session timeouts with organization-level defaults
+   - Key capabilities: Timeout configuration, session invalidation, token management
+   - User roles involved: Organization admins, end users
+5. **Authentication Audit Logging** — Comprehensive logging of all authentication events
+   - Key capabilities: Event capture, log storage, audit trail
+   - User roles involved: Security teams, compliance officers
+6. **Rate Limiting & Security** — Protection against credential attacks and brute force
+   - Key capabilities: Request throttling, account lockout, attack detection
+   - User roles involved: All users (protection), security team (monitoring)
+
+## User Roles / Personas
+| Role | Description | Key needs |
+|------|-------------|-----------|
+| End User | Regular employee using the application | Simple login flow, MFA setup guidance, minimal friction |
+| Organization Admin | Configures auth policies for their company | SSO configuration UI, policy controls, user management |
+| System Admin | Application users with elevated privileges | Enforced MFA, secure access, audit visibility |
+| IT Administrator | Customer IT staff configuring SSO | Clear setup documentation, metadata exchange, troubleshooting tools |
+| Security Team | Internal security stakeholders | Audit logs, compliance reports, threat monitoring |
+
+## Ambiguities & Missing Context
+1. **Recovery code specifics** — Number generated, storage format, usage limits not specified
+2. **SMS provider selection** — Which service, cost structure, international coverage unclear
+3. **Rate limiting parameters** — Specific thresholds, lockout durations, scope (per-IP vs per-user) undefined
+4. **SSO fallback behavior** — What happens when SSO provider is unavailable or unreachable
+5. **MFA enforcement timeline** — Whether admin MFA requirement is immediate or has grace period
+6. **Session timeout granularity** — Whether individual users can override organization defaults
+7. **Audit log retention** — Storage duration, export formats, compliance requirements not specified
+8. **SSO configuration UX** — Whether metadata upload is self-service or requires support intervention
+9. **OIDC flow support** — Which OAuth2/OIDC flows and grant types will be implemented
+10. **User migration strategy** — How existing users transition when their organization enables SSO
+11. **Authentication error handling** — Account lockout policies, password reset behavior with SSO enabled
+12. **Testing and validation** — How SSO integrations will be tested without access to customer identity providers
+
+## Gap Analysis
+
+| # | Input Gap | What Was Unclear | Resolution | Impact on Stories |
+|---|-----------|-----------------|------------|-------------------|
+| G-1 | "backup recovery codes when enabling MFA" | How many codes? Format? Single-use? Regeneration process? | **Assumed:** 10 single-use codes, regenerate on demand | MFA setup and recovery stories need specific code count and UX |
+| G-2 | "SMS as MFA methods" | Which SMS provider? International support? Cost implications? | **Deferred:** Needs vendor evaluation and budget approval | SMS MFA stories blocked until provider selected |
+| G-3 | "rate limiting on auth endpoints is a priority" | Specific limits? Per-IP/per-user? Lockout duration? | **Assumed:** 5 attempts per IP per 15min, exponential backoff | Rate limiting implementation stories need concrete thresholds |
+| G-4 | SSO enforcement + "no password fallback" | Behavior when SSO provider unavailable? Emergency access? | **Deferred:** Needs security team input on disaster recovery | SSO enforcement stories missing failure scenarios |
+| G-5 | "MFA for all admin-role users by Q3" | Immediate enforcement or grace period? Migration timeline? | **Asked:** Sent to Clarifier for phasing strategy | Admin MFA stories need implementation timeline |
+| G-6 | "configurable session timeout per organization" | Can individual users override? Admin-only setting? | **Assumed:** Organization-only setting, no user override | Session management stories simplified to org-level only |
+| G-7 | "Audit log all authentication events" | Retention period? Export formats? Real-time vs batch? | **Deferred:** Needs compliance team requirements | Audit logging stories missing retention and export specs |
+| G-8 | "SAML 2.0 and OpenID Connect" | Which OIDC flows? SAML binding types? Metadata management? | **Assumed:** Authorization Code flow for OIDC, HTTP-POST for SAML | SSO integration stories assume standard flows |
+| G-9 | Enterprise customer SSO configuration | Self-service setup? Metadata upload UX? Support involvement? | **Deferred:** Needs customer success team input | SSO configuration stories missing UX approach |
+| G-10 | Existing user transition to SSO orgs | Account linking? Email verification? Migration UX? | **Deferred:** Needs product team decision on user experience | User migration stories blocked until UX defined |
+
+**Unresolved gaps:** 6 (these MUST appear in the Clarifier's questions)  
+**Resolved by assumption:** 4 (these MUST be validated by stakeholder)
+
+## Technical Considerations
+- **Database schema:** New tables for SSO providers, MFA devices, audit events, session policies
+- **JWT token updates:** May need additional claims for MFA status, SSO provider, organization policies
+- **Integration complexity:** SAML assertion validation, OIDC token exchange, metadata parsing
+- **SMS provider API:** Rate limits, delivery receipts, international routing, fallback providers
+- **Audit log performance:** High-volume writes, indexing strategy, potential separate database
+- **Session storage scaling:** Redis cluster for 50k+ concurrent sessions, timeout cleanup jobs
+- **Rate limiting storage:** Distributed counters, Redis-based sliding windows
+- **Cryptographic requirements:** SAML signature validation, TOTP secret storage encryption
+
+## Suggested Feature Decomposition
+1. **Phase 1 (Foundation):** Rate limiting, audit logging, basic MFA (TOTP only)
+2. **Phase 2 (Core SSO):** SAML 2.0 integration, organization-level SSO enforcement
+3. **Phase 3 (Enhanced MFA):** SMS support, recovery codes, admin MFA enforcement
+4. **Phase 4 (Advanced SSO):** OpenID Connect, self-service configuration, session policies
+5. **Phase 5 (User Experience):** Migration tools, comprehensive error handling, monitoring
+
+## Stakeholder Clarifications
+
+# Stakeholder Responses
+
+## Critical Questions
+
+### 1. Admin MFA enforcement timing and rollout
+**Answer:** Phased rollout with 30-day advance notice. We'll notify all admin users when the feature launches, give them 30 days to set up MFA, then enforce it. No exceptions after that.
+**Additional context:** We learned from the credential stuffing incident that we need to be firm on security deadlines. The security team is breathing down our necks on this Q3 commitment, and our board wants to see concrete progress after that breach.
+
+### 2. SSO provider failure and emergency access
+**Answer:** No fallback during provider outages. Hard enforcement with no emergency bypass.
+**Additional context:** This was a tough call, but our enterprise customers actually prefer this approach. They'd rather have their team unable to access the app than have a potential security hole. We'll document this clearly in our SLAs and suggest customers have backup admin access through a different provider if needed.
+
+### 3. Existing user transition to SSO-enabled organizations
+**Answer:** Automatic email-based linking, but require the user to verify ownership of their corporate email during their first SSO login. If emails don't match exactly, we'll provide a one-time manual linking process through customer support.
+**Additional context:** We've seen this pain point with other enterprise features. Most of our customers use corporate email domains, so exact matching should work for 95% of cases.
+
+## Important Questions
+
+### 4. SMS provider and international requirements
+**Answer:** Go with Twilio, US/Canada only for now. Budget cap at $800/month for the first year.
+**Additional context:** About 80% of our enterprise users are North America-based. We can add international support in Q1 2027 once we see actual usage patterns and have a better sense of costs.
+
+### 5. SSO configuration experience
+**Answer:** Self-service with a guided setup wizard, but include an "assisted setup" option that creates a support ticket for customers who need help.
+**Additional context:** Our enterprise customers have varying technical skill levels. Some have dedicated IT teams, others just have one person handling everything. The wizard should be simple enough for the latter group.
+
+### 6. Audit log retention and compliance requirements
+**Answer:** 2-year retention for authentication events, CSV and JSON export options. We need SOC 2 Type II compliance.
+**Additional context:** We're planning our SOC 2 audit for next spring, and auth logs are a key control. Some of our healthcare customers have also asked about longer retention, so 2 years covers both needs.
+
+## Nice to Have
+
+### 7. Authentication error handling specifics
+**Answer:** For SSO-enabled organizations, disable password reset entirely. Account lockouts must be resolved through the organization admin or our support team.
+**Additional context:** Consistency is key here. If an org has chosen SSO enforcement, we shouldn't provide backdoors that could confuse users or create security gaps.
+
+### 8. Testing SSO integrations during development
+**Answer:** Use Auth0's free tier for OIDC testing and set up a basic SAML test environment. Don't over-engineer this.
+**Additional context:** Our engineering team tends to overthink testing infrastructure. Keep it simple—we just need to verify the happy path works and can handle basic error scenarios.
+
+## Assumptions Review
+
+| # | Assumption | Verdict | Notes |
+|---|-----------|---------|-------|
+| 1 | Recovery codes: 10 single-use backup codes generated per user, user can regenerate on demand | ✅ Correct | Standard approach, no issues here |
+| 2 | Rate limiting: 5 failed attempts per IP address per 15 minutes with exponential backoff | ❌ Wrong | Make it 3 attempts per 10 minutes. We need to be more aggressive after last quarter's incident |
+| 3 | Session timeout control: Organization-level setting only, individual users cannot override their org's policy | ✅ Correct | This is exactly what enterprise customers expect |
+| 4 | OIDC/SAML flows: Authorization Code flow for OpenID Connect, HTTP-POST binding for SAML | ⚠️ Partially | Authorization Code is correct, but also support HTTP-Redirect binding for SAML. Some of our Okta customers prefer it |

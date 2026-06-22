@@ -1,0 +1,202 @@
+# Agent Definition
+
+# Agent: Story Decomposer
+
+## Role
+You are a senior product engineer who breaks feature-level analysis into well-scoped, implementable user stories. Each story should be a thin vertical slice — end-to-end for a narrow use case.
+
+## When used
+- **Generate mode, Step 2 (Decompose Features):** Take the Story Analyst's feature analysis and produce individual user stories grouped by feature.
+
+## Inputs
+- Story Analyst's analysis document (features, personas, ambiguities, technical considerations)
+- Optional project context
+
+## Output
+
+```markdown
+# Story Decomposition
+
+## Feature: [Feature Name]
+
+### [STORY-SLUG]: [Short title]
+**As a** [specific role],
+**I want** [specific capability],
+**so that** [specific business outcome].
+
+**Scope:**
+- In: [what this story covers]
+- Out: [what's explicitly excluded]
+
+**Dependencies:** [other stories, APIs, data]
+**Priority:** P1 / P2 / P3
+**Size estimate:** S / M / L
+
+---
+
+### [STORY-SLUG]: [Next story]
+...
+
+## Feature: [Next Feature Name]
+...
+
+## Dependency Map
+[List of inter-story and inter-feature dependencies]
+
+## Suggested Implementation Order
+1. [Story] — [why first]
+2. [Story] — [depends on #1]
+3. ...
+```
+
+## Rules
+1. **Every story follows the format:** "As a [role], I want [capability], so that [benefit]" — the benefit must be a real business outcome, not a restatement of the capability.
+2. **Thin vertical slices.** Each story should deliver something end-to-end for a narrow use case. Avoid horizontal stories ("build all the API endpoints", "build all the UI").
+3. **Small enough to implement in one cycle.** If a story has more than 3-4 distinct behaviors, split it.
+4. **Include infrastructure stories** where needed (project setup, database schema, CI config) — but only when they're prerequisites that can't be folded into a feature story.
+5. **Explicit scope boundaries.** Every story must state what's in and what's out.
+6. **Don't invent requirements.** Decompose what was described — if features are missing, flag them in a "Potential additions" section, don't silently include them.
+
+# Task
+Given the analysis and stakeholder clarifications below, decompose all identified features into well-scoped user stories. Follow your output format exactly. Use the stakeholder's answers to resolve any ambiguities — do not leave questions open that have been answered.
+IMPORTANT: Output the actual stories directly. Do NOT describe what you would do or summarize — produce the deliverable itself.
+
+# Input
+
+## Analysis
+
+# Input Analysis
+
+## Summary
+A comprehensive bulk data import system for a CRM application that allows users to upload CSV/Excel files containing contacts, companies, or deals with full validation, preview capabilities, async processing for large files, error handling, and import management features including history tracking and undo functionality.
+
+## Identified Features
+1. **File Upload & Format Support** — Handle CSV and Excel uploads up to 50MB with encoding detection
+   - Key capabilities: Multi-format support, size validation, encoding handling (UTF-8, Latin-1, Windows-1252), BOM marker handling
+   - User roles involved: End users, enterprise customers
+
+2. **Column Mapping Interface** — Visual mapping tool for CSV columns to CRM data fields
+   - Key capabilities: Drag-and-drop or dropdown mapping, custom field support, mapping persistence/templates
+   - User roles involved: End users
+
+3. **Data Validation Engine** — Comprehensive validation against business rules and schema
+   - Key capabilities: Email/phone format validation, required field checks, uniqueness constraints, custom field type validation, enum value matching
+   - User roles involved: System (automated), end users (review results)
+
+4. **Preview & Review System** — Show validation results before committing import
+   - Key capabilities: Sample data display (20 rows), per-row validation status, error summaries by type
+   - User roles involved: End users
+
+5. **Async Import Processing** — Handle large files with progress tracking
+   - Key capabilities: Celery task management, progress percentage, time estimation, 100k+ row handling
+   - User roles involved: End users, system administrators
+
+6. **Error Handling & Reporting** — Comprehensive error management and reporting
+   - Key capabilities: Error report CSV generation, partial import options, row-level error tracking
+   - User roles involved: End users
+
+7. **Import History & Management** — Track and manage past imports
+   - Key capabilities: Import log with metadata, status tracking, file name preservation
+   - User roles involved: End users, system administrators
+
+8. **Undo/Rollback System** — Ability to reverse imports within 48 hours
+   - Key capabilities: Soft-delete mechanism, time-based expiration, bulk record reversal
+   - User roles involved: End users, system administrators
+
+## User Roles / Personas
+| Role | Description | Key needs |
+|------|-------------|-----------|
+| End User | CRM users performing data imports | Easy-to-use interface, clear error messages, progress visibility, data integrity assurance |
+| Enterprise Customer | Users migrating large datasets from other CRMs | Bulk processing capability, detailed error reporting, minimal downtime, data validation |
+| System Administrator | IT staff managing CRM operations | Import monitoring, troubleshooting tools, system performance oversight, compliance tracking |
+
+## Ambiguities & Missing Context
+1. **Duplicate handling against existing records** — Uniqueness checks mention "against existing records" but behavior is unclear — Should duplicates be rejected, updated, or flagged for manual review?
+2. **Permissions and access control** — No specification of who can perform imports, view import history, or execute undo operations — Suggested default: role-based permissions with admin oversight
+3. **Concurrent import limitations** — Whether multiple users can run imports simultaneously or per-user limits — System performance and database locking implications not addressed
+4. **Custom field enum validation failure behavior** — When imported values don't match existing dropdown options — Should system auto-create new options, reject the row, or prompt for mapping?
+5. **Undo operation scope** — Whether undo reverses all records from an import or allows selective row-level reversal — Full import reversal is simpler but less flexible
+6. **Error report delivery method** — How users access error CSV files — Download from UI, email delivery, or S3 link with expiration?
+7. **Data transformation capabilities** — Whether system can modify data during import (case normalization, phone number formatting) or only validates as-is
+8. **Import failure recovery** — Behavior when async processing fails mid-import — Partial completion handling, retry mechanisms, cleanup procedures
+
+## Technical Considerations
+- **Database performance**: Bulk inserts for 100k+ rows require optimization (batch processing, connection pooling, index management during import)
+- **Memory management**: Large file processing needs streaming/chunking to avoid memory exhaustion
+- **S3 storage lifecycle**: Uploaded files and error reports need retention policies and cleanup
+- **Celery task monitoring**: Need dead letter queues, retry policies, and task failure handling
+- **Transaction management**: Import operations need atomic commits or rollback capabilities
+- **API rate limiting**: File upload and processing endpoints need protection against abuse
+- **Security considerations**: File content validation to prevent CSV injection, malware scanning for uploads
+- **Audit logging**: Compliance requirements may mandate detailed import activity logs
+
+## Suggested Feature Decomposition
+**Phase 1 (MVP)**: File Upload + Basic Validation + Sync Import
+- Features 1, 2, 3, 6 (limited to sync processing under 10k rows)
+
+**Phase 2 (Scale)**: Async Processing + Progress Tracking  
+- Features 4, 5 (add async capability for large files)
+
+**Phase 3 (Management)**: History + Undo
+- Features 7, 8 (add import lifecycle management)
+
+**Phase 4 (Enterprise)**: Advanced Features
+- Enhanced error handling, data transformation, admin tools, compliance features
+
+## Stakeholder Clarifications
+
+# Stakeholder Responses
+
+## Critical Questions
+
+### 1. Duplicate Email Handling Against Existing Records
+**Answer:** Flag duplicates as validation errors and skip them during import. We cannot have duplicate emails in our CRM - it breaks our email marketing automation and customer communication workflows.
+**Additional context:** Our sales team relies on unique email identification for lead scoring. However, provide a clear report of which emails were skipped so users can manually review if they're legitimate updates to existing contacts.
+
+### 2. Custom Field Enum Value Mismatch Behavior
+**Answer:** Reject rows with invalid enum values and include them in the error report. Do not auto-create new dropdown options.
+**Additional context:** Our custom fields are carefully curated by our admin team for reporting consistency. Auto-creating values would mess up our dashboards and filters. If users need new dropdown values, they should request them through our normal admin process first.
+
+### 3. Undo Operation Granularity
+**Answer:** Undo the entire import as one atomic operation. All records from that import session get soft-deleted together.
+**Additional context:** Selective undo would be too complex for our users to manage safely. We've seen too many data integrity issues when people try to cherry-pick changes. All-or-nothing is cleaner and less error-prone.
+
+### 4. Import Permission Model
+**Answer:** Any user with "Edit Contacts" permission can import contacts. Only Admin and Manager roles can view full import history and undo any user's import. Users can only see their own import history and undo their own imports.
+**Additional context:** This aligns with our existing CRM permissions. We need managers to have oversight capability for compliance audits, but regular users shouldn't be able to mess with each other's work.
+
+### 5. Async Processing Failure Recovery
+**Answer:** Fully roll back failed imports. Users restart the entire process if something goes wrong.
+**Additional context:** Data consistency is more important than convenience for our enterprise customers. They'd rather re-run a reliable process than wonder if their data is in a weird partial state.
+
+## Important Questions
+
+### 1. Concurrent Import Limitations
+**Answer:** Allow up to 3 concurrent imports system-wide. Queue additional requests with estimated wait time.
+**Additional context:** Our database performance team says more than 3 simultaneous large imports impacts other users. Better to queue with transparency than slow down the whole system.
+
+### 2. Error Report Delivery Method
+**Answer:** Downloadable from import history page for 30 days, then auto-deleted. No email delivery.
+**Additional context:** Our file storage costs are already high, but 30 days gives people time to download during business travel. Email attachments get blocked by some customer firewalls.
+
+### 3. Data Transformation Scope
+**Answer:** Perform basic cleanup - trim whitespace, standardize phone number format to E.164, and title case for names. No other transformations.
+**Additional context:** Our customer success team spends too much time cleaning up messy imports. Standard phone formatting will help with our calling integrations.
+
+## Nice to Have
+
+### 1. Progress Estimation Accuracy
+**Answer:** Use rows-per-second calculation updated every 10 seconds. Show both percentage complete and estimated time remaining.
+
+### 2. File Encoding Detection Priority
+**Answer:** Auto-detect with UTF-8 preference. If confidence is below 90%, show encoding dropdown for user selection.
+
+## Assumptions Review
+
+| # | Assumption | Verdict | Notes |
+|---|-----------|---------|-------|
+| 1 | 48-hour undo window is fixed | ⚠️ Partially | Should be configurable by admin - some customers want 7 days, others want 24 hours |
+| 2 | Preview limited to first 20 rows | ✅ Correct | 20 is perfect for validation without overwhelming the screen |
+| 3 | Partial imports are always user-choice | ✅ Correct | Users need control over this decision for their business process |
+| 4 | Column mapping is required | ❌ Wrong | Auto-map by column name first, then let users adjust. Most CSVs have standard headers |
+| 5 | Single entity type per import | ✅ Correct | Mixed imports would be too complex for v1. Keep it simple |

@@ -1,0 +1,694 @@
+# Agent Definition
+
+# Agent: Acceptance Criteria Writer
+
+## Role
+You are a senior QA engineer and requirements specialist. You take decomposed user stories and produce complete, testable acceptance criteria covering happy path, edge cases, error states, and non-functional requirements.
+
+## When used
+- **Generate mode, Step 3 (Draft AC):** Write AC for newly decomposed stories.
+- **Refine mode, Step 3 (Rewrite):** Improve existing stories and AC based on gap analysis.
+
+## Inputs
+
+### Generate mode
+- Decomposed stories from the Story Decomposer
+- Original user input for context
+
+### Refine mode
+- Original stories (from import)
+- Gap Analysis report identifying specific weaknesses
+- Original user input for context
+
+## Output
+
+For each story, produce a complete AC document in this exact format. Start the very first line of your output with `# Acceptance Criteria:` — no preamble, no summary, no introduction.
+
+```markdown
+# Acceptance Criteria: [STORY-SLUG] — [Title]
+
+## Refined Story Statement
+As a [specific role], I want [specific capability], so that [specific business outcome].
+
+## Assumptions
+- [Assumption] — **Confirmed / Unconfirmed**
+
+If any assumption is **Unconfirmed**, add it to the Open Questions section at the end — do not silently treat it as confirmed in your AC.
+
+## Gap Traceability
+
+Map every gap from the Story Analyst's analysis to your AC. This section is mandatory.
+
+| Gap | Resolution | Reference |
+|-----|-----------|-----------|
+| [Gap from analyst] | Addressed in AC / Out of Scope / Open Question | AC-N or rationale |
+
+If the analyst identified 10 gaps, this table must have 10 rows. No silent drops.
+
+## Acceptance Criteria
+
+### AC-1: [Short descriptive name]
+**Given** [precondition/context]
+**When** [action/trigger]
+**Then** [expected outcome]
+
+**Category:** happy-path | edge-case | error-handling | boundary | security | performance
+**Priority:** must-have | should-have
+
+### AC-2: [Next criterion]
+...
+
+### AC-AUTH-1: Unauthenticated Access Rejected
+**Given** no valid authentication token is present
+**When** a request is made to [this feature's endpoints]
+**Then** the system returns 401 Unauthorized
+
+**Category:** security
+**Priority:** must-have
+
+### AC-AUTH-2: Insufficient Permissions Rejected
+**Given** an authenticated user without [required role/permission]
+**When** a request is made to [this feature's endpoints]
+**Then** the system returns 403 Forbidden with a message identifying the missing permission
+
+**Category:** security
+**Priority:** must-have
+
+## Non-Functional Requirements
+
+### Error Handling
+| Scenario | Expected Behavior | Priority |
+|----------|------------------|----------|
+| [Error scenario] | [Specific user-facing behavior] | must-have |
+
+### Performance
+- **Response time:** [Target, e.g., "< 500ms p95"]
+- **Scale:** [Expected load for this feature]
+
+### Security
+- **Input validation:** [Specific inputs and constraints]
+- **Authorization:** [Required permission checks]
+
+### Accessibility
+- [WCAG requirements if applicable]
+
+## Open Questions
+- [Any unconfirmed assumptions or deferred gaps that need stakeholder input]
+- If none, write "None — all gaps resolved."
+```
+
+## Rules
+1. **Every story gets at minimum:** one happy-path AC, one edge case, one error/boundary condition.
+2. **AC must be testable.** If you can't write a test for it, rewrite it until you can. "The system should be fast" is not testable. "API response returns within 500ms at p95 under 100 concurrent requests" is.
+3. **Use Given/When/Then consistently.** Every AC follows this format.
+4. **Be specific about error behavior.** "Handle errors gracefully" is not an AC. "When the external API returns 503, display 'Service temporarily unavailable' with a retry button; auto-retry 3x with exponential backoff" is.
+5. **Preserve original intent.** In Refine mode, improve clarity and completeness without changing the scope of what was asked for. If scope seems wrong, flag it — don't silently fix it.
+6. **Don't prescribe implementation.** AC define what, not how. "Data is persisted" not "Data is stored in PostgreSQL."
+
+## Gap Accountability
+For EVERY gap the Story Analyst identified, you must do one of the following:
+1. **Write an AC** that addresses it, OR
+2. **List it explicitly in "Out of Scope"** with a one-line rationale for deferral, OR
+3. **Move it to "Open Questions"** if it requires stakeholder input
+
+No silent drops. If the analyst found 10 gaps, your AC document must account for all 10 — either as an AC, an out-of-scope item, or an open question. This is the traceability contract between analyst and AC writer.
+
+## No Conditional Language in AC
+Each AC must commit to a specific behavior. Do NOT write:
+- "If uniqueness is enforced, then..." — decide yes or no
+- "Changes are preserved (or the user is warned)" — pick one behavior
+- "The system handles this appropriately" — specify how
+
+If the behavior genuinely depends on a decision not yet made, move it to **Open Questions** rather than hedging in the AC itself. A conditional AC is an untestable AC.
+
+## Pre-Flight: Count Stories Before Writing
+
+Before you write any AC, count the total number of stories in your input. State this count at the very start of your output as a comment to yourself:
+
+`<!-- STORY COUNT: N stories to process -->`
+
+After completing all stories, add a coverage footer:
+
+```markdown
+---
+## Coverage Summary
+| # | Story Slug | AC Count | Auth AC | Gap Rows | Status |
+|---|-----------|----------|---------|----------|--------|
+| 1 | [SLUG] | [N] | Yes/No | [N] | Complete |
+| ... | ... | ... | ... | ... | ... |
+| **Total** | **[N] stories** | | | | |
+```
+
+If the total in the footer doesn't match the pre-flight count, you missed stories — go back and write them.
+
+## No Truncation or Summarization
+You MUST produce complete acceptance criteria for EVERY story in the input.
+
+Do NOT:
+- Stop partway through and write "the remaining stories follow the same pattern"
+- Write a summary section claiming coverage you didn't actually produce
+- Produce abbreviated AC for later stories to save space
+- Skip stories because the output is getting long
+
+Long output is expected and correct. A full AC document for 15+ stories will be hundreds of lines — that is normal. If your output is under 500 lines for 10+ stories, you almost certainly truncated.
+
+Every story MUST have: all functional AC + AC-AUTH-1 (401) + AC-AUTH-2 (403) + Gap Traceability table + Open Questions section. No exceptions.
+
+# Task
+Write complete acceptance criteria for EVERY user story below. Follow your output format exactly.
+
+CRITICAL INSTRUCTION: Start your VERY FIRST LINE with '# Acceptance Criteria:' for the first story. No preamble, no introduction, no summary. Produce the actual deliverable directly.
+
+COVERAGE INSTRUCTION: Count the stories in the input FIRST. State the count as an HTML comment on line 1. Then write complete AC for EVERY story — each with: functional AC (happy path + edge cases + errors), AC-AUTH-1 (401 test), AC-AUTH-2 (403 test), Gap Traceability table, and Open Questions. End with a Coverage Summary table proving you covered all stories.
+
+GAP TRACEABILITY: The Story Analyst identified specific gaps in the Gap Analysis section below. For EACH story, include a Gap Traceability table mapping every relevant gap to an AC, Out of Scope, or Open Question. The reviewer scores this — missing gap traceability costs 12+ points per story.
+
+# Input
+
+## Original Requirements
+
+# Feature: Bulk CSV Import with Validation and Progress Tracking
+
+## Overview
+Our CRM application needs a bulk data import feature. Users should be able to upload CSV files containing contacts, companies, or deals, have the data validated against our schema, preview the results, and then commit the import. Large files (100k+ rows) are common for enterprise customers migrating from other CRMs.
+
+## Requirements
+- Support CSV and Excel (.xlsx) file uploads
+- File size limit: 50MB
+- Column mapping UI: user maps CSV columns to our data fields (name, email, phone, company, custom fields)
+- Validation rules: email format, phone format, required fields, unique constraints (no duplicate emails within an import or against existing records), custom field type validation
+- Preview screen showing first 20 rows with validation status per row
+- For large files, process asynchronously with a progress bar (percentage + estimated time remaining)
+- On validation failure: show error summary (count by error type) and allow user to download an error report CSV with row numbers and error descriptions
+- Partial import option: allow importing valid rows while skipping invalid ones
+- Import history: show past imports with date, file name, row counts (total, imported, skipped, failed)
+- Undo import: ability to reverse an import within 48 hours (soft-delete the imported records)
+
+## Technical Context
+- Backend: Python/Django with Celery for async tasks
+- Database: PostgreSQL with ~2M existing contact records
+- File storage: AWS S3 for uploaded files
+- Frontend: React with drag-and-drop file upload
+- Current max API payload: 10MB (uploads go direct to S3 with presigned URLs)
+
+## Known Edge Cases
+- CSV files with different encodings (UTF-8, Latin-1, Windows-1252)
+- Files with BOM markers
+- Inconsistent date formats across rows
+- Phone numbers in international formats
+- Custom fields with dropdown/enum values — imports need to match existing options or fail
+
+## Gap Analysis (from Story Analyst)
+
+# Input Analysis
+
+## Summary
+A comprehensive bulk data import system for a CRM application that allows users to upload CSV/Excel files containing contacts, companies, or deals with validation, progress tracking, error handling, and audit capabilities for enterprise-scale data migration.
+
+## Identified Features
+1. **File Upload & Processing** — Multi-format file handling with size limits and encoding detection
+   - Key capabilities: CSV/Excel support, 50MB limit, encoding detection, direct S3 upload
+   - User roles involved: End users, data migration specialists
+
+2. **Column Mapping Interface** — User-driven mapping between CSV columns and CRM data fields
+   - Key capabilities: Drag-and-drop mapping, custom field support, field type awareness
+   - User roles involved: End users, system administrators
+
+3. **Data Validation Engine** — Comprehensive validation against business rules and schema constraints
+   - Key capabilities: Format validation, uniqueness checks, custom field validation, required field enforcement
+   - User roles involved: System administrators (rule configuration), end users (validation feedback)
+
+4. **Preview & Error Management** — Interactive preview with validation feedback and error reporting
+   - Key capabilities: 20-row preview, per-row validation status, error report generation, partial import options
+   - User roles involved: End users, data quality managers
+
+5. **Asynchronous Processing** — Background processing with progress tracking for large datasets
+   - Key capabilities: Progress bars, time estimation, Celery integration, status notifications
+   - User roles involved: End users (monitoring), system administrators (queue management)
+
+6. **Import History & Audit Trail** — Comprehensive logging of all import activities
+   - Key capabilities: Import tracking, file metadata, success/failure statistics, audit reports
+   - User roles involved: System administrators, compliance officers
+
+7. **Undo Functionality** — Ability to reverse imports within a time window
+   - Key capabilities: Soft-delete mechanism, 48-hour window, impact assessment
+   - User roles involved: System administrators, end users with appropriate permissions
+
+## User Roles / Personas
+| Role | Description | Key needs |
+|------|-------------|-----------|
+| End User | CRM users uploading contact lists, deal data | Simple interface, clear error messages, progress visibility |
+| Data Migration Specialist | Enterprise customers migrating from other CRMs | Bulk processing, complex mapping, error analysis tools |
+| System Administrator | Manages import policies and troubleshoots issues | Audit trails, configuration controls, system health monitoring |
+| Data Quality Manager | Ensures imported data meets standards | Validation rule configuration, error analysis, quality reports |
+| Compliance Officer | Tracks data handling for regulatory purposes | Audit logs, undo capabilities, data lineage tracking |
+
+## Ambiguities & Missing Context
+1. **Custom field validation rules** — How are custom field types and validation rules defined? What happens when CSV data doesn't match dropdown options?
+2. **Duplicate detection scope** — How is duplicate checking performed against 2M existing records without performance issues?
+3. **User permission model** — Who can import what data types? Are there role-based restrictions?
+4. **Partial import behavior** — When importing valid rows only, how are related records (company-contact relationships) handled?
+5. **Undo scope and dependencies** — What happens to related records created after import? How are foreign key relationships handled during undo?
+6. **File retention policy** — How long are uploaded files kept in S3? Who can access them?
+7. **Encoding detection mechanism** — How are file encodings automatically detected? What's the fallback for unknown encodings?
+8. **International phone validation** — What constitutes valid international formats? Which countries/formats are supported?
+9. **Date format handling** — What date formats are accepted? How are ambiguous dates (MM/DD vs DD/MM) resolved?
+10. **Error recovery workflow** — After fixing data issues, can users re-upload just the failed rows or must they start over?
+11. **Concurrent import handling** — Can multiple users import simultaneously? Are there queue limits?
+12. **Progress tracking granularity** — What triggers progress updates? How accurate are time estimates?
+
+## Gap Analysis
+
+| # | Input Gap | What Was Unclear | Resolution | Impact on Stories |
+|---|-----------|-----------------|------------|-------------------|
+| G-1 | "custom field type validation" | Custom fields aren't defined - types, rules, dropdown options, validation logic | **Deferred:** Need stakeholder input on custom field schema and validation requirements | Affects validation engine, column mapping, and error handling stories |
+| G-2 | "unique constraints...against existing records" | No performance strategy for checking duplicates against 2M records | **Deferred:** Need database indexing strategy and batch processing approach | Critical for validation engine performance and user experience |
+| G-3 | "allow importing valid rows while skipping invalid ones" | Unclear how related records (company-contact) are handled in partial imports | **Deferred:** Need business rules for handling incomplete relationship data | Affects import processing logic and data integrity |
+| G-4 | "ability to reverse an import within 48 hours" | Undo scope unclear - what about records created/modified after import? | **Deferred:** Need cascading delete policy and relationship handling rules | Major impact on undo functionality and audit trail design |
+| G-5 | "show past imports" - no user mentioned | Import history access not defined - all users or role-based? | **Assumed:** Role-based access - users see their imports, admins see all | Affects UI permissions and data filtering in history feature |
+| G-6 | "CSV files with different encodings" | No encoding detection method specified | **Assumed:** Auto-detect with chardet library, fallback to UTF-8 with error handling | Affects file processing pipeline and error reporting |
+| G-7 | "Phone numbers in international formats" | No validation rules specified for international numbers | **Assumed:** Use phonenumbers library with configurable country whitelist | Affects validation engine and configuration management |
+| G-8 | "Inconsistent date formats across rows" | No date parsing strategy specified | **Assumed:** Multiple format attempts with configurable preference order | Affects validation logic and user feedback |
+| G-9 | "uploads go direct to S3" but also "File size limit: 50MB" | Unclear where size limit is enforced - client or server | **Assumed:** Client-side validation with server-side verification | Affects upload UI and backend validation |
+| G-10 | File cleanup and retention not mentioned | S3 storage costs and security implications unclear | **Deferred:** Need file retention policy and cleanup schedule | Affects system architecture and operational costs |
+| G-11 | "async tasks" but no failure handling | What happens if Celery task fails mid-processing? | **Assumed:** Task retry logic with user notification on permanent failure | Affects async processing reliability and user experience |
+
+**Unresolved gaps:** 5 (these MUST appear in the Clarifier's questions)
+**Resolved by assumption:** 6 (these MUST be validated by stakeholder)
+
+## Technical Considerations
+- **Database performance:** Duplicate checking against 2M records requires optimized indexing strategy and potentially batch processing
+- **File storage:** S3 direct upload reduces server load but requires presigned URL management and cleanup policies
+- **Async processing:** Celery queue management, task monitoring, and failure recovery mechanisms needed
+- **Memory usage:** Large file processing (50MB) requires streaming/chunked processing to avoid memory issues
+- **Data integrity:** Foreign key relationships during partial imports and undo operations need careful transaction management
+- **Scalability:** Multiple concurrent imports may require queue throttling and resource allocation
+- **Security:** File validation to prevent CSV injection attacks, access control for import history
+
+## Suggested Feature Decomposition
+**Phase 1 - Core Import (High Priority)**
+1. File Upload & Basic Validation (file format, size, encoding)
+2. Column Mapping Interface
+3. Basic Data Validation (required fields, formats)
+4. Synchronous Import for Small Files (<1000 rows)
+
+**Phase 2 - Enterprise Features (Medium Priority)**
+5. Asynchronous Processing with Progress Tracking
+6. Advanced Validation (duplicates, custom fields)
+7. Preview & Error Reporting
+8. Partial Import Capability
+
+**Phase 3 - Management & Audit (Lower Priority)**
+9. Import History & Audit Trail
+10. Undo Functionality
+11. Advanced Error Recovery Workflow
+
+## Stakeholder Clarifications
+
+Looking at this bulk CSV import feature, let me provide my responses as the product owner:
+
+# Stakeholder Responses
+
+## Critical Questions
+
+### 1. Custom field validation and dropdown matching
+**Answer:** Create new dropdown options automatically, but flag them for admin review. We don't want to block imports just because someone typed "Webinar" instead of "Web Event" in the Lead Source field.
+**Additional context:** Our sales team frequently encounters slight variations in terminology from imported data. We'd rather have the data imported and clean it up later than lose leads due to strict validation. However, admins should get a weekly digest of new dropdown values that were auto-created so they can merge duplicates.
+
+### 2. Duplicate detection performance strategy  
+**Answer:** Batch processing approach sounds good. Check duplicates in chunks of 1000 rows - that should keep things responsive.
+**Additional context:** We've had issues before where large operations lock up the system. Our enterprise customers often import 50k+ records, so this has to be rock solid.
+
+### 3. Partial import relationship handling
+**Answer:** Link orphaned contacts to a default "Unknown Company" placeholder rather than rejecting them. We can't afford to lose contact data just because company names don't match perfectly.
+**Additional context:** Our sales reps spend way too much time re-entering contact data. If there's a way to import the contact even with a messy company reference, do it. They can fix the company association later.
+
+### 4. Undo scope for related records  
+**Answer:** Only revert unmodified records and show a clear warning about which records were left untouched. This is about safety - we can't accidentally undo work that happened after the import.
+
+### 5. Import permission model
+**Answer:** Regular users can import contacts and companies (they need both for their territory management), but only admins can import deals. No approval workflows - that would slow down our sales process too much.
+**Additional context:** Deals have financial implications and complex validation rules around revenue recognition. But contacts and companies are pretty safe - worst case we have duplicate data to clean up.
+
+## Important Questions
+
+### 1. File retention and cleanup policy
+**Answer:** Keep files for 90 days instead of 30. Our compliance team requires at least 60 days for audit trails, and the extra 30 days gives us breathing room for debugging issues.
+**Additional context:** We're in healthcare adjacent space, so data retention is more strict than typical SaaS. Storage costs aren't a major concern compared to compliance headaches.
+
+### 2. Async processing failure recovery  
+**Answer:** Task restart is fine for now. Resume functionality would be nice but adds complexity we don't need in v1.
+
+### 3. Date format ambiguity resolution
+**Answer:** Default to MM/DD/YYYY but add a format picker in the column mapping UI. Let users specify "this column is DD/MM/YYYY" during the mapping step.
+**Additional context:** We have customers in both US and European markets, so this comes up regularly. The format picker approach lets users fix it upfront rather than dealing with wrong dates later.
+
+### 4. International phone number validation scope
+**Answer:** Support US, Canada, UK, Australia, and Germany to start. That covers 90% of our customer base. Make the default country configurable by admin.
+
+### 5. Encoding detection fallback behavior  
+**Answer:** Try the common encodings automatically, then show a dropdown if they all fail. Don't make users think about encoding unless we absolutely have to.
+
+## Nice to Have  
+_All defaults look reasonable - no strong opinions on these implementation details._
+
+## Assumptions Review
+
+| # | Assumption | Verdict | Notes |
+|---|-----------|---------|-------|
+| 1 | Role-based import history access | ✅ Correct | Privacy is important, users should only see their own import history |
+| 2 | UTF-8 encoding preference | ✅ Correct | Most modern files are UTF-8, good default choice |
+| 3 | Strict email uniqueness | ❌ Wrong | Allow duplicate emails but flag them with warnings. Sometimes legitimate duplicates exist (shared emails, family businesses) |
+| 4 | Soft-delete undo mechanism | ✅ Correct | Hard deletes are too risky, soft-delete gives us recovery options |
+| 5 | S3 direct upload approach | ✅ Correct | Keeps server load down and uploads are faster |
+| 6 | Celery-based async processing | ✅ Correct | We already have this infrastructure, makes sense to use it |
+
+## Stories
+
+# Story Decomposition
+
+## Feature: File Upload & Processing
+
+### UPLOAD-BASIC: File upload with format validation
+**As a** CRM user,
+**I want** to upload CSV and Excel files up to 50MB,
+**so that** I can import my contact data from various sources without format conversion hassles.
+
+**Scope:**
+- In: CSV and .xlsx file uploads, 50MB size limit, direct S3 upload with presigned URLs
+- Out: Other file formats (.xls, .tsv), files over 50MB, multiple file uploads at once
+
+**Dependencies:** S3 bucket configuration, presigned URL generation
+**Priority:** P1
+**Size estimate:** M
+
+---
+
+### UPLOAD-ENCODING: Automatic encoding detection and handling
+**As a** data migration specialist,
+**I want** the system to automatically detect and handle different file encodings,
+**so that** I don't have to manually convert files or lose data due to encoding issues.
+
+**Scope:**
+- In: Auto-detection of UTF-8, Latin-1, Windows-1252, BOM handling, fallback UI when detection fails
+- Out: Manual encoding specification upfront, complex encoding conversions
+
+**Dependencies:** File upload infrastructure (UPLOAD-BASIC)
+**Priority:** P2
+**Size estimate:** S
+
+---
+
+## Feature: Column Mapping Interface
+
+### MAPPING-UI: Visual column mapping interface
+**As a** CRM user,
+**I want** to map CSV columns to CRM fields through a visual interface,
+**so that** I can ensure my data goes to the right places without technical knowledge.
+
+**Scope:**
+- In: Drag-and-drop mapping, field type indicators, required field highlighting, preview of mapped data
+- Out: Bulk column operations, saved mapping templates, complex field transformations
+
+**Dependencies:** File upload (UPLOAD-BASIC), CRM field schema
+**Priority:** P1
+**Size estimate:** L
+
+---
+
+### MAPPING-DATES: Date format specification during mapping
+**As a** CRM user importing international data,
+**I want** to specify date formats for each column during mapping,
+**so that** my dates are interpreted correctly regardless of regional format differences.
+
+**Scope:**
+- In: Format picker per date column (MM/DD/YYYY, DD/MM/YYYY, etc.), format preview, default to MM/DD/YYYY
+- Out: Auto-detection of date formats, complex date parsing, timezone handling
+
+**Dependencies:** Column mapping UI (MAPPING-UI)
+**Priority:** P2
+**Size estimate:** S
+
+---
+
+## Feature: Data Validation Engine
+
+### VALIDATE-BASIC: Core field validation
+**As a** CRM user,
+**I want** my imported data validated against field requirements,
+**so that** I don't import incomplete or incorrectly formatted records.
+
+**Scope:**
+- In: Email format validation, phone number validation (US/CA/UK/AU/DE), required field checking
+- Out: Complex business rule validation, cross-record validation, real-time validation during mapping
+
+**Dependencies:** Column mapping (MAPPING-UI)
+**Priority:** P1
+**Size estimate:** M
+
+---
+
+### VALIDATE-DUPLICATES: Duplicate detection with batched processing
+**As a** data quality manager,
+**I want** duplicate email addresses detected efficiently during import,
+**so that** I can identify potential duplicates without the system becoming unresponsive.
+
+**Scope:**
+- In: Email duplicate checking in 1000-row batches, duplicate warnings (not blocking), duplicate flagging in preview
+- Out: Real-time duplicate checking, complex fuzzy matching, automatic duplicate resolution
+
+**Dependencies:** Core validation (VALIDATE-BASIC), database indexing
+**Priority:** P1
+**Size estimate:** M
+
+---
+
+### VALIDATE-CUSTOM: Custom field dropdown auto-creation
+**As a** CRM administrator,
+**I want** new dropdown values automatically created during import,
+**so that** data imports aren't blocked by slight terminology variations.
+
+**Scope:**
+- In: Auto-creation of new dropdown options, admin notification of new values, weekly digest of created values
+- Out: Fuzzy matching of existing options, automatic value merging, complex validation rules
+
+**Dependencies:** Core validation (VALIDATE-BASIC), admin notification system
+**Priority:** P2
+**Size estimate:** M
+
+---
+
+## Feature: Preview & Error Management
+
+### PREVIEW-VALIDATION: Import preview with validation feedback
+**As a** CRM user,
+**I want** to see a preview of my import with validation results,
+**so that** I can fix issues before committing to the import.
+
+**Scope:**
+- In: First 20 rows preview, per-row validation status, error highlighting, row-level error messages
+- Out: Full file preview, inline editing, real-time preview updates
+
+**Dependencies:** Validation engine (VALIDATE-BASIC), column mapping (MAPPING-UI)
+**Priority:** P1
+**Size estimate:** M
+
+---
+
+### PREVIEW-ERRORS: Error reporting and export
+**As a** data migration specialist,
+**I want** to download a detailed error report for validation failures,
+**so that** I can efficiently fix data issues in my source files.
+
+**Scope:**
+- In: Downloadable CSV error report with row numbers and error descriptions, error count summary by type
+- Out: Error fixing within the app, automated error correction, complex error analysis
+
+**Dependencies:** Validation preview (PREVIEW-VALIDATION)
+**Priority:** P1
+**Size estimate:** S
+
+---
+
+### PREVIEW-PARTIAL: Partial import option
+**As a** CRM user,
+**I want** to import valid rows while skipping invalid ones,
+**so that** I don't lose good data while fixing problematic records.
+
+**Scope:**
+- In: Option to proceed with valid rows only, "Unknown Company" placeholder for orphaned contacts, clear success/skip statistics
+- Out: Automatic data correction, complex relationship resolution, batch processing of failed records
+
+**Dependencies:** Validation preview (PREVIEW-VALIDATION), data validation engine
+**Priority:** P1
+**Size estimate:** M
+
+---
+
+## Feature: Asynchronous Processing
+
+### ASYNC-PROCESSING: Background processing for large files
+**As a** data migration specialist,
+**I want** large imports processed in the background,
+**so that** I can import enterprise-scale datasets without blocking my work.
+
+**Scope:**
+- In: Automatic async processing for >1000 rows, Celery task queue integration, email notification on completion
+- Out: Sync/async choice by user, real-time streaming, complex task orchestration
+
+**Dependencies:** Celery infrastructure, validation engine, import core logic
+**Priority:** P1
+**Size estimate:** L
+
+---
+
+### ASYNC-PROGRESS: Import progress tracking
+**As a** CRM user,
+**I want** to see real-time progress of my import,
+**so that** I know how long to wait and can plan my next tasks.
+
+**Scope:**
+- In: Progress percentage, estimated time remaining, current processing stage, refresh every 5 seconds
+- Out: Detailed row-by-row progress, pause/resume functionality, complex time estimation algorithms
+
+**Dependencies:** Async processing (ASYNC-PROCESSING)
+**Priority:** P1
+**Size estimate:** M
+
+---
+
+### ASYNC-RECOVERY: Task failure handling and retry
+**As a** system administrator,
+**I want** failed import tasks to retry automatically and notify users of permanent failures,
+**so that** temporary issues don't result in lost import work.
+
+**Scope:**
+- In: Automatic task restart on failure, user notification for permanent failures, task status tracking
+- Out: Resume from checkpoint, manual retry controls, complex failure analysis
+
+**Dependencies:** Async processing (ASYNC-PROCESSING), notification system
+**Priority:** P2
+**Size estimate:** M
+
+---
+
+## Feature: Import History & Audit Trail
+
+### HISTORY-TRACKING: Import history with role-based access
+**As a** CRM user,
+**I want** to see a history of my past imports,
+**so that** I can track what data I've added and troubleshoot any issues.
+
+**Scope:**
+- In: Import list with date/time/filename, row counts (total/imported/skipped/failed), role-based filtering (users see their imports, admins see all)
+- Out: Detailed audit logs, data lineage tracking, complex search and filtering
+
+**Dependencies:** User authentication system, import processing core
+**Priority:** P2
+**Size estimate:** M
+
+---
+
+### HISTORY-DETAILS: Detailed import statistics and metadata
+**As a** system administrator,
+**I want** detailed statistics for each import operation,
+**so that** I can monitor system performance and help users with issues.
+
+**Scope:**
+- In: Processing time, error breakdown by type, file metadata, user information, validation statistics
+- Out: Real-time analytics, performance dashboards, automated reporting
+
+**Dependencies:** Import history (HISTORY-TRACKING)
+**Priority:** P3
+**Size estimate:** S
+
+---
+
+## Feature: Undo Functionality
+
+### UNDO-IMPORT: Reverse imports with safety checks
+**As a** CRM administrator,
+**I want** to reverse an import while protecting subsequently modified records,
+**so that** I can fix import mistakes without losing valid user work.
+
+**Scope:**
+- In: Soft-delete unmodified imported records, clear warning about protected records, 90-day window, undo confirmation
+- Out: Hard delete options, complex relationship cascading, selective undo by record type
+
+**Dependencies:** Import history (HISTORY-TRACKING), record modification tracking
+**Priority:** P2
+**Size estimate:** L
+
+---
+
+### UNDO-CLEANUP: Automated file and record cleanup
+**As a** system administrator,
+**I want** imported files and soft-deleted records automatically cleaned up after 90 days,
+**so that** storage costs are controlled and compliance requirements are met.
+
+**Scope:**
+- In: Scheduled cleanup job, 90-day retention period, S3 file deletion, soft-delete record cleanup
+- Out: Configurable retention periods, selective cleanup controls, backup before cleanup
+
+**Dependencies:** File storage system, undo functionality (UNDO-IMPORT)
+**Priority:** P3
+**Size estimate:** M
+
+---
+
+## Feature: Permission Management
+
+### PERMISSIONS-IMPORT: Role-based import restrictions
+**As a** system administrator,
+**I want** to control what data types users can import,
+**so that** sensitive data like deals are only handled by authorized personnel.
+
+**Scope:**
+- In: Users can import contacts and companies, only admins can import deals, permission checking before import start
+- Out: Granular field-level permissions, approval workflows, dynamic permission assignment
+
+**Dependencies:** User role system, import processing core
+**Priority:** P1
+**Size estimate:** S
+
+---
+
+## Dependency Map
+- **File uploads** → Column mapping → Validation → Preview → Processing
+- **Async processing** depends on core validation and mapping
+- **History tracking** depends on all import operations
+- **Undo functionality** depends on history and record tracking
+- **Permission system** gates all import operations
+- **Cleanup jobs** depend on undo and file storage systems
+
+## Suggested Implementation Order
+1. **UPLOAD-BASIC** — Core file upload capability
+2. **PERMISSIONS-IMPORT** — Security controls before any processing
+3. **MAPPING-UI** — Essential for any real imports
+4. **VALIDATE-BASIC** — Data quality foundation
+5. **PREVIEW-VALIDATION** — User feedback before committing
+6. **PREVIEW-PARTIAL** — Allows proceeding with imperfect data
+7. **VALIDATE-DUPLICATES** — Enterprise requirement
+8. **ASYNC-PROCESSING** — Scalability for large files
+9. **ASYNC-PROGRESS** — User experience for long operations
+10. **HISTORY-TRACKING** — Audit trail basics
+11. **PREVIEW-ERRORS** — Better debugging tools
+12. **VALIDATE-CUSTOM** — Flexibility for dropdown values
+13. **MAPPING-DATES** — International support
+14. **UNDO-IMPORT** — Safety net for mistakes
+15. **UPLOAD-ENCODING** — Edge case handling
+16. **ASYNC-RECOVERY** — Reliability improvements
+17. **HISTORY-DETAILS** — Enhanced monitoring
+18. **UNDO-CLEANUP** — Operational maintenance
+
+## Coverage Check
+| Feature from Analysis | Stories | Status |
+|----------------------|---------|--------|
+| File Upload & Processing | UPLOAD-BASIC, UPLOAD-ENCODING | Covered |
+| Column Mapping Interface | MAPPING-UI, MAPPING-DATES | Covered |
+| Data Validation Engine | VALIDATE-BASIC, VALIDATE-DUPLICATES, VALIDATE-CUSTOM | Covered |
+| Preview & Error Management | PREVIEW-VALIDATION, PREVIEW-ERRORS, PREVIEW-PARTIAL | Covered |
+| Asynchronous Processing | ASYNC-PROCESSING, ASYNC-PROGRESS, ASYNC-RECOVERY | Covered |
+| Import History & Audit Trail | HISTORY-TRACKING, HISTORY-DETAILS | Covered |
+| Undo Functionality | UNDO-IMPORT, UNDO-CLEANUP | Covered |
+| (Permission Management) | PERMISSIONS-IMPORT | Added based on stakeholder clarification |

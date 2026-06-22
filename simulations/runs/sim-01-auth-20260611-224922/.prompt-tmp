@@ -1,0 +1,701 @@
+# Agent Definition
+
+# Agent: Story Quality Reviewer
+
+## Role
+You are a principal engineer performing quality review of story packages. You evaluate the complete output — stories, acceptance criteria, and test specifications — against a rubric and provide actionable feedback.
+
+## When used
+- **Generate mode, Step 5 (Quality Review):** Score the complete generated package.
+- **Refine mode, Step 5 (Quality Review):** Score the refined package and compare against original quality.
+
+## Inputs
+
+### Generate mode
+- Complete story package: stories + AC + test specs
+- Original user input
+
+### Refine mode
+- Refined story package: improved stories + AC + test specs
+- Original stories (for comparison)
+
+## Output
+
+```markdown
+# Quality Review
+
+## Summary
+- **Stories reviewed:** [count]
+- **Passed (80+):** [count]
+- **Needs revision:** [count]
+- **Blocked:** [count]
+- **Overall quality:** [brief assessment]
+
+## Per-Story Review
+
+### [STORY-SLUG]: [Title]
+
+**Score: [X]/100** — **PASS / NEEDS-REVISION / BLOCK**
+
+| # | Category | Max | Score | Notes |
+|---|----------|-----|-------|-------|
+| 1 | Story clarity | 15 | /15 | |
+| 2 | Gap analysis quality | 15 | /15 | |
+| 3 | AC completeness | 20 | /20 | |
+| 4 | AC specificity | 10 | /10 | |
+| 5 | Test coverage | 20 | /20 | |
+| 6 | Test quality | 10 | /10 | |
+| 7 | Traceability | 5 | /5 | |
+| 8 | Architecture alignment | 5 | /5 | |
+| | **TOTAL** | **100** | **/100** | |
+
+**Strengths:**
+- [What's good about this story package]
+
+**Issues:**
+
+### Critical (blocks implementation)
+1. **[Issue]** — Found in: [analysis|AC|tests] — [Specific problem and why it blocks]
+
+### Major (should fix before implementation)
+1. **[Issue]** — Found in: [analysis|AC|tests] — [Problem and suggested fix]
+
+### Minor (improve if time allows)
+1. **[Issue]** — Found in: [analysis|AC|tests] — [Suggestion]
+
+**Consistency checks:**
+- [ ] Story statement in AC matches original intent
+- [ ] All analyst-identified gaps are addressed in AC (or explicitly deferred with rationale)
+- [ ] All AC map to at least one test case (coverage matrix complete)
+- [ ] All test cases trace back to an AC (no orphan tests)
+- [ ] Assumptions are consistent across all documents
+- [ ] Dependencies are consistent across all documents
+- [ ] Authorization tests (401/403) are present
+
+**Improvement vs. Original** (Refine mode only):
+- [What improved]
+- [What still needs work]
+
+**Feedback for revision** (if NEEDS-REVISION or BLOCK):
+- **To Story Analyst:** [Specific feedback on the gap analysis]
+- **To AC Writer:** [Specific feedback on the acceptance criteria]
+- **To Test Generator:** [Specific feedback on the test specifications]
+
+---
+
+### [Next story]
+...
+
+## Cross-Story Issues
+1. [Issue affecting multiple stories]
+2. ...
+
+## Recommendation
+[Overall recommendation: approve, revise specific stories, or restructure]
+```
+
+## Scoring Rubric (8 categories, 100 points)
+
+**IMPORTANT: You MUST use this exact rubric with these exact point allocations. The max points per category are NOT equal — they are weighted. Do NOT create your own rubric categories or point scales.**
+
+### 1. Story Clarity (15 points)
+
+Score the **refined story statement**, NOT the original raw input. The analyst and AC writer's job is to improve clarity — evaluate how well they succeeded.
+
+| Score | Criteria |
+|-------|----------|
+| 15 | Refined story has specific role, capability, and benefit. Scope is clearly bounded. A new team member could understand it without context. |
+| 10 | Mostly clear, but one element (usually the benefit) is generic or could be misinterpreted. |
+| 5 | Refined story still has multiple ambiguities despite analyst input. |
+| 0 | No refined story produced, or refined story is as vague as the original. |
+
+### 2. Gap Analysis Quality (15 points)
+
+| Score | Criteria |
+|-------|----------|
+| 15 | All significant gaps identified. Each gap is specific, explains why it matters, and suggests a resolution. No obvious gaps missed. |
+| 10 | Most gaps found. Some gaps lack specificity or suggested resolutions. |
+| 5 | Surface-level analysis. Restates obvious issues without adding insight. Misses non-obvious gaps. |
+| 0 | Analysis is generic/boilerplate. Could apply to any story without modification. |
+
+### 3. AC Completeness (20 points)
+
+| Score | Criteria |
+|-------|----------|
+| 20 | Happy path + error handling + boundary conditions + auth/permissions all covered. Every AC is testable with Given/When/Then. Priorities are realistic. |
+| 15 | Happy path and most error cases covered. A few edge cases missing. AC are testable. |
+| 10 | Happy path covered but error handling is thin. Some AC are vague ("handles errors gracefully"). |
+| 5 | Only happy path. No error or boundary coverage. AC are not testable as written. |
+| 0 | AC are missing or just restate the story description. |
+
+### 4. AC Specificity (10 points)
+
+| Score | Criteria |
+|-------|----------|
+| 10 | Preconditions are specific (user role, data state). Expected outcomes are objectively verifiable. No ambiguous language. |
+| 7 | Mostly specific. One or two AC use vague language ("appropriate error," "reasonable time"). |
+| 3 | Many AC are vague. Preconditions are generic ("a user"). Outcomes aren't verifiable. |
+| 0 | AC read like wishes, not specifications. |
+
+### 5. Test Coverage (20 points)
+
+| Score | Criteria |
+|-------|----------|
+| 20 | Every AC has at least one test. Coverage matrix is complete. Test data is concrete. Happy + negative + boundary tests all present. Authorization tests (401/403) included. |
+| 15 | Most AC covered. Coverage matrix exists. A few gaps in negative/boundary testing. |
+| 10 | Happy path tests present. Negative/boundary testing thin. Some AC have no corresponding test. |
+| 5 | Only happy path tests. No coverage matrix. Test data is vague. |
+| 0 | Tests are missing, generic, or don't relate to the AC. |
+
+### 6. Test Quality (10 points)
+
+| Score | Criteria |
+|-------|----------|
+| 10 | Tests are independent. Test data is concrete with specific values. Steps are clear. Assertions are specific and verifiable. Implementation order makes sense. |
+| 7 | Tests are mostly good. A few share implicit state or have vague assertions. |
+| 3 | Tests depend on each other. Test data uses placeholders. Assertions are too broad. |
+| 0 | Tests couldn't be implemented without significant clarification. |
+
+### 7. Traceability (5 points)
+
+| Score | Criteria |
+|-------|----------|
+| 5 | End-to-end chain is clear: story → gaps → AC → tests. Coverage matrix proves full coverage. No orphan artifacts. |
+| 3 | Chain is mostly traceable. One or two gaps in the mapping. |
+| 1 | Artifacts exist but aren't clearly connected. Hard to tell which test validates which AC. |
+| 0 | No traceability. Artifacts feel independently generated. |
+
+### 8. Architecture Alignment (5 points)
+
+| Score | Criteria |
+|-------|----------|
+| 5 | AC and tests reflect project architecture. Tech stack is correct. Constraints are respected. |
+| 3 | Mostly aligned. One or two AC or tests that don't match the architecture. |
+| 1 | Significant misalignment. AC or tests assume a different architecture than the project uses. |
+| 0 | No project context was loaded, OR no evidence that project context was used. |
+
+## Verdict Thresholds
+
+| Score | Verdict | Meaning |
+|-------|---------|---------|
+| 80-100 | **PASS** | Ready for implementation. Minor issues can be fixed during dev. |
+| 50-79 | **NEEDS-REVISION** | Has fixable gaps. Send back with specific feedback. |
+| 0-49 | **BLOCK** | Fundamental problems. Needs stakeholder input or architectural decisions. |
+
+## Critical Blocker Override — MANDATORY
+
+If ANY critical/blocking issue exists (e.g., unresolved dependency, missing architectural decision, compliance gap):
+1. The verdict **MUST** be **BLOCK**
+2. The total score **MUST** be **below 50**
+3. Reduce Story Clarity and AC Completeness scores to reflect that the artifacts are provisional/unimplementable
+
+This is NOT optional. This is NOT a judgment call. Do NOT give a "conditional PASS" or score above 50 when a blocker exists. A score of 60 with a blocker sends a dangerously mixed signal — downstream consumers see "60 = NEEDS-REVISION" and may attempt to implement. Score below 50, verdict BLOCK, every time.
+
+## Rules
+1. **Score against the rubric, not personal preference.** The 8 categories and point allocations above are fixed.
+2. **Every issue must be specific and actionable.** "AC could be better" is not feedback. "AC-3 says 'handle errors' but doesn't specify which errors or user-facing behavior — add specific error scenarios" is.
+3. **Distinguish severity levels.** CRITICAL = would cause implementation failure. MAJOR = significant quality gap. MINOR = improvement opportunity.
+4. **80+ is passing.** Don't inflate scores. A "good" story package scores 80-89. A "great" one scores 90+.
+5. **In Refine mode, always compare against original.** Show what improved and what didn't.
+6. **Provide per-agent feedback on revision.** When the verdict is NEEDS-REVISION or BLOCK, include specific feedback directed at each agent that needs to revise, so the revision loop can route correctly.
+
+# Task
+Perform a quality review of the complete story package below. Score each story against your 8-category rubric (80+ to pass). Provide specific, actionable feedback. Include per-agent feedback sections (To Story Analyst, To AC Writer, To Test Generator) if revision is needed.
+
+CRITICAL INSTRUCTION: You MUST output the actual review with scores, verdicts, and feedback. Do NOT summarize or describe what you would review. Produce the complete deliverable directly.
+
+TRACEABILITY CHECK: Verify that every gap in the Gap Analysis table is accounted for in the AC (as an AC, out-of-scope item, or open question). Score Gap Analysis Quality based on whether the analyst produced a structured gap table with resolution statuses.
+
+# Input
+
+## Original Requirements
+
+# Feature: User Authentication with SSO and MFA
+
+## Overview
+We need to add enterprise authentication to our B2B SaaS application. Currently users authenticate with email/password only. We need to support Single Sign-On (SSO) via SAML 2.0 and OpenID Connect, plus Multi-Factor Authentication (MFA) using TOTP authenticator apps and SMS codes.
+
+## Requirements
+- Existing email/password auth must continue to work alongside SSO
+- Enterprise customers can configure SSO for their organization — once enabled, their users must use SSO (no password fallback)
+- MFA should be optional per-user by default, but organization admins can enforce it for all users
+- Support TOTP (Google Authenticator, Authy) and SMS as MFA methods
+- Users should be able to add backup recovery codes when enabling MFA
+- Session management: configurable session timeout per organization (default 24h, max 30 days)
+- Audit log all authentication events (login, logout, MFA challenge, SSO assertion, failed attempts)
+
+## Technical Context
+- Backend is Node.js/Express with PostgreSQL
+- Frontend is React SPA
+- Currently using JWT tokens stored in httpOnly cookies
+- We have ~50k users across ~200 organizations
+- Must support SCIM provisioning for SSO organizations in a future phase (not this one)
+
+## Stakeholder Notes
+- Security team requires MFA for all admin-role users by Q3
+- Some enterprise customers have specifically asked for Okta and Azure AD integration
+- We had a credential stuffing incident last quarter — rate limiting on auth endpoints is a priority
+
+## Gap Analysis (from Story Analyst)
+
+# Input Analysis
+
+## Summary
+Adding enterprise authentication capabilities to an existing B2B SaaS application, including Single Sign-On (SAML 2.0, OpenID Connect), Multi-Factor Authentication (TOTP, SMS), and organization-level security policies.
+
+## Identified Features
+1. **SSO Integration** — Support SAML 2.0 and OpenID Connect for enterprise customers
+   - Key capabilities: SAML/OIDC protocol handling, organization-specific SSO configuration, forced SSO mode
+   - User roles involved: End users, Organization admins, System admins
+
+2. **Multi-Factor Authentication** — TOTP and SMS-based second factor authentication
+   - Key capabilities: TOTP app integration, SMS delivery, backup recovery codes, per-user and org-wide MFA policies
+   - User roles involved: End users, Organization admins
+
+3. **Authentication Policy Management** — Organization-level controls for auth requirements
+   - Key capabilities: SSO enforcement, MFA enforcement, session timeout configuration
+   - User roles involved: Organization admins
+
+4. **Session Management Enhancement** — Configurable session timeouts per organization
+   - Key capabilities: JWT token lifecycle management, organization-specific timeout rules
+   - User roles involved: Organization admins, End users
+
+5. **Security Audit Logging** — Comprehensive authentication event tracking
+   - Key capabilities: Login/logout tracking, MFA events, SSO assertions, failed attempts
+   - User roles involved: Security team, Organization admins
+
+6. **Authentication Security Hardening** — Rate limiting and credential attack prevention
+   - Key capabilities: Rate limiting on auth endpoints, failed attempt tracking
+   - User roles involved: All users (transparent), Security team
+
+## User Roles / Personas
+| Role | Description | Key needs |
+|------|-------------|-----------|
+| End User | Employee of enterprise customer | Seamless auth experience, reliable SSO, easy MFA setup |
+| Organization Admin | Manages auth policies for their org | Configure SSO, enforce MFA, control session timeouts |
+| System Admin | Users with admin role in the application | Must comply with MFA requirement by Q3, need reliable access |
+| Security Team | Internal stakeholders managing security | Audit visibility, compliance controls, threat prevention |
+
+## Ambiguities & Missing Context
+1. **SSO Configuration Process** — How do organization admins configure SSO? Self-service portal or support ticket?
+2. **SSO Downtime Handling** — What happens if configured SSO provider is unavailable? Emergency access method?
+3. **Recovery Code Specifics** — How many codes generated? One-time use? How are they displayed/stored?
+4. **SMS MFA Details** — International number support? Cost handling? Delivery failure handling?
+5. **Rate Limiting Specifications** — Specific limits per endpoint? Response behavior (delay, block, CAPTCHA)?
+6. **User Migration Path** — How do existing users transition when their org enables SSO?
+7. **TOTP Setup UX** — QR code flow? Manual key entry? App recommendations?
+8. **Audit Log Retention** — How long are logs kept? Who can access them?
+9. **Session Timeout Granularity** — Per organization or per user within organization?
+10. **Provider-Specific Features** — What specific Okta/Azure AD integration features are needed beyond standard SAML/OIDC?
+
+## Gap Analysis
+
+| # | Input Gap | What Was Unclear | Resolution | Impact on Stories |
+|---|-----------|-----------------|------------|-------------------|
+| G-1 | "Enterprise customers can configure SSO" | No details on configuration UI, process, or validation | **Deferred:** Needs UX/product input on self-service vs. assisted setup | SSO configuration stories need UI wireframes and validation requirements |
+| G-2 | "Must use SSO (no password fallback)" | No emergency access method specified if SSO provider fails | **Assumed:** Super-admin emergency access will be preserved | SSO enforcement stories need emergency access exception handling |
+| G-3 | "Backup recovery codes when enabling MFA" | No specification of code count, format, or display method | **Assumed:** 10 single-use alphanumeric codes, downloadable PDF | MFA setup stories need recovery code generation and display flow |
+| G-4 | "SMS as MFA methods" | No details on international support, cost model, or delivery failures | **Deferred:** Needs business/legal input on SMS service scope | SMS MFA stories need service provider selection and error handling |
+| G-5 | "Rate limiting on auth endpoints is a priority" | No specific limits, enforcement methods, or user experience defined | **Assumed:** Standard progressive delays (1s, 5s, 15s) with IP-based tracking | Security hardening stories need rate limiting algorithm and UX design |
+| G-6 | "Configurable session timeout per organization" | Unclear if timeout is org-wide or per-user preference within org | **Assumed:** Organization-wide setting that applies to all users in that org | Session management stories need org-level timeout configuration UI |
+| G-7 | "Audit log all authentication events" | No retention period, access controls, or export requirements specified | **Deferred:** Needs compliance/legal input on retention and access policies | Audit logging stories need data governance requirements |
+| G-8 | "Support SCIM provisioning... in a future phase" | No clarity on data model implications for current user management | **Assumed:** Current user schema is SCIM-compatible or easily extended | User management stories may need schema review for future SCIM compatibility |
+| G-9 | "Okta and Azure AD integration" | No details on specific features beyond standard SAML/OIDC protocols | **Deferred:** Needs customer discovery on specific provider requirements | SSO provider stories need detailed integration requirements per provider |
+| G-10 | Migration of existing users when SSO is enabled | No process defined for transitioning from password to SSO authentication | **Assumed:** Existing users retain password access until first SSO login | User transition stories need migration workflow and communication plan |
+
+**Unresolved gaps:** 4 (these MUST appear in the Clarifier's questions)
+**Resolved by assumption:** 6 (these MUST be validated by stakeholder)
+
+## Technical Considerations
+- JWT token management needs to support variable session timeouts per organization
+- Database schema additions for SSO configuration, MFA settings, audit logs
+- SAML/OIDC libraries and certificate management for signature validation
+- SMS service integration (Twilio, AWS SNS) with cost and delivery monitoring
+- Rate limiting implementation (Redis-based or in-memory) with IP tracking
+- Audit log storage strategy (separate table, log aggregation service)
+- TOTP shared secret secure storage and QR code generation
+- Existing authentication middleware needs to support multiple auth flows
+
+## Suggested Feature Decomposition
+1. **Phase 1 (Foundation):** MFA Implementation, Security Hardening, Audit Logging
+2. **Phase 2 (SSO Core):** SAML 2.0 integration, basic SSO configuration
+3. **Phase 3 (SSO Enhancement):** OpenID Connect, organization policy enforcement
+4. **Phase 4 (Management):** Session management, organization admin tools
+
+## Complete Story Package
+
+### Stories
+
+Looking at the analysis and stakeholder clarifications, I'll decompose the identified features into implementable user stories. Each story will be a thin vertical slice delivering end-to-end value.
+
+# Story Decomposition
+
+## Feature: SSO Integration
+
+### SSO-CONFIG: Self-service SSO configuration wizard
+**As an** organization admin,
+**I want** a guided setup wizard to configure SAML 2.0 or OpenID Connect for my organization,
+**so that** my team can authenticate through our corporate identity provider without IT tickets.
+
+**Scope:**
+- In: Wizard UI for SAML/OIDC metadata entry, certificate upload, test authentication, configuration validation
+- Out: Bulk user provisioning, advanced provider-specific features, multiple SSO providers per org
+
+**Dependencies:** Database schema for SSO configuration storage
+**Priority:** P1
+**Size estimate:** L
+
+---
+
+### SSO-SAML: SAML 2.0 authentication flow
+**As an** end user in an SSO-enabled organization,
+**I want** to log in using SAML 2.0 through my corporate identity provider,
+**so that** I can access the application with my existing corporate credentials.
+
+**Scope:**
+- In: SAML assertion validation, user attribute mapping, session creation, error handling
+- Out: Custom attribute mapping, group/role synchronization
+
+**Dependencies:** SSO-CONFIG, database schema
+**Priority:** P1
+**Size estimate:** L
+
+---
+
+### SSO-OIDC: OpenID Connect authentication flow
+**As an** end user in an SSO-enabled organization,
+**I want** to log in using OpenID Connect through my corporate identity provider,
+**so that** I can access the application with my existing corporate credentials.
+
+**Scope:**
+- In: OIDC token validation, user claims processing, session creation, error handling
+- Out: Custom claims mapping, refresh token handling
+
+**Dependencies:** SSO-CONFIG, database schema
+**Priority:** P1
+**Size estimate:** L
+
+---
+
+### SSO-ENFORCE: SSO enforcement with user migration
+**As an** organization admin,
+**I want** to enforce SSO for all users in my organization with a 30-day grace period,
+**so that** I can ensure secure authentication while giving users time to transition.
+
+**Scope:**
+- In: SSO enforcement toggle, 30-day grace period with email notifications, password disabling after first SSO login
+- Out: Immediate enforcement, per-user migration timelines
+
+**Dependencies:** SSO-SAML or SSO-OIDC, email notification system
+**Priority:** P1
+**Size estimate:** M
+
+---
+
+### SSO-EMERGENCY: Emergency admin SSO bypass
+**As a** super admin,
+**I want** to temporarily disable SSO enforcement for an organization during provider outages,
+**so that** users aren't completely locked out when their identity provider is unavailable.
+
+**Scope:**
+- In: Manager approval workflow, 4-hour auto-expiry, bypass activation/deactivation, audit trail
+- Out: Indefinite bypass, user-level bypass, automated provider health checking
+
+**Dependencies:** SSO-ENFORCE, audit logging
+**Priority:** P2
+**Size estimate:** M
+
+## Feature: Multi-Factor Authentication
+
+### MFA-TOTP-SETUP: TOTP authenticator app setup
+**As an** end user,
+**I want** to set up TOTP using my authenticator app with QR code scanning,
+**so that** I can secure my account with two-factor authentication.
+
+**Scope:**
+- In: QR code generation, manual key entry option, verification step, shared secret storage
+- Out: Multiple TOTP devices per user, device naming/management
+
+**Dependencies:** Database schema for MFA settings
+**Priority:** P1
+**Size estimate:** M
+
+---
+
+### MFA-TOTP-AUTH: TOTP authentication during login
+**As an** end user with TOTP enabled,
+**I want** to complete my login by entering my authenticator app code,
+**so that** I can securely access my account.
+
+**Scope:**
+- In: TOTP code validation, time window handling, backup code fallback option
+- Out: Remember device option, grace period for new setups
+
+**Dependencies:** MFA-TOTP-SETUP
+**Priority:** P1
+**Size estimate:** S
+
+---
+
+### MFA-SMS-SETUP: SMS MFA setup and delivery
+**As an** end user,
+**I want** to set up SMS as my MFA method for US/Canadian phone numbers,
+**so that** I can receive authentication codes via text message.
+
+**Scope:**
+- In: Phone number validation, SMS delivery service integration, US/Canada restriction, delivery confirmation
+- Out: International numbers, voice call fallback, phone number verification
+
+**Dependencies:** SMS service provider (Twilio/AWS SNS), database schema
+**Priority:** P2
+**Size estimate:** M
+
+---
+
+### MFA-SMS-AUTH: SMS authentication with retry
+**As an** end user with SMS MFA enabled,
+**I want** to receive and enter SMS codes to complete login, with retry capability when delivery fails,
+**so that** I can reliably access my account even with SMS delivery issues.
+
+**Scope:**
+- In: SMS code generation/validation, retry button, delivery failure handling, TOTP recommendation
+- Out: Multiple retry attempts, alternative delivery methods
+
+**Dependencies:** MFA-SMS-SETUP
+**Priority:** P2
+**Size estimate:** S
+
+---
+
+### MFA-RECOVERY: Recovery codes generation and usage
+**As an** end user enabling MFA,
+**I want** to receive 8 single-use backup recovery codes that I can download as PDF,
+**so that** I can still access my account if I lose my primary MFA device.
+
+**Scope:**
+- In: 8 human-readable alphanumeric codes, one-time use validation, PDF download, confirmation flow
+- Out: Recovery code regeneration, multiple recovery methods
+
+**Dependencies:** MFA-TOTP-SETUP or MFA-SMS-SETUP
+**Priority:** P1
+**Size estimate:** S
+
+---
+
+### MFA-RECOVERY-AUTH: Recovery code authentication
+**As an** end user who has lost access to my primary MFA device,
+**I want** to use one of my backup recovery codes to log in,
+**so that** I can regain access to my account and set up a new MFA method.
+
+**Scope:**
+- In: Recovery code validation, code consumption, prompt to set up new MFA method
+- Out: Recovery code regeneration during use, partial code matching
+
+**Dependencies:** MFA-RECOVERY
+**Priority:** P1
+**Size estimate:** S
+
+---
+
+### MFA-ORG-ENFORCE: Organization-wide MFA enforcement
+**As an** organization admin,
+**I want** to require MFA for all users in my organization,
+**so that** I can meet our security compliance requirements.
+
+**Scope:**
+- In: Organization MFA policy toggle, user notification of requirement, grace period for setup
+- Out: Role-based MFA requirements, per-user exemptions
+
+**Dependencies:** MFA TOTP/SMS setup stories
+**Priority:** P1
+**Size estimate:** M
+
+---
+
+### MFA-ADMIN-ENFORCE: Mandatory MFA for admin users
+**As a** system administrator,
+**I want** all users with admin roles across any organization to be required to use MFA by Q3,
+**so that** privileged accounts have additional security protection.
+
+**Scope:**
+- In: Automatic MFA requirement for admin role users, enforcement deadline, setup reminders
+- Out: Admin-specific MFA methods, emergency admin access
+
+**Dependencies:** MFA-ORG-ENFORCE, role detection logic
+**Priority:** P1
+**Size estimate:** S
+
+## Feature: Session Management Enhancement
+
+### SESSION-ORG-TIMEOUT: Organization-wide session timeout configuration
+**As an** organization admin,
+**I want** to configure session timeout duration for all users in my organization (default 24h, max 30 days),
+**so that** I can balance security requirements with user convenience according to our policies.
+
+**Scope:**
+- In: Organization-wide timeout setting UI, timeout validation (max 30 days), JWT token lifecycle management
+- Out: Per-user timeout preferences, role-based timeout rules
+
+**Dependencies:** JWT token infrastructure updates
+**Priority:** P2
+**Size estimate:** M
+
+## Feature: Security Audit Logging
+
+### AUDIT-LOG: Authentication event logging
+**As a** security team member,
+**I want** all authentication events (login, logout, MFA challenges, SSO assertions, failed attempts) to be logged with 3-year retention,
+**so that** I can investigate security incidents and meet compliance requirements.
+
+**Scope:**
+- In: Comprehensive event logging, 3-year retention, structured log format, performance optimization
+- Out: Real-time alerting, advanced analytics, log aggregation service integration
+
+**Dependencies:** Database schema for audit logs
+**Priority:** P1
+**Size estimate:** M
+
+---
+
+### AUDIT-VIEW: Organization audit log viewing
+**As an** organization admin,
+**I want** to view authentication events for users in my organization with filtering and search,
+**so that** I can monitor security activity and investigate issues.
+
+**Scope:**
+- In: Web UI for audit log viewing, filtering by date/user/event type, search functionality, pagination
+- Out: Real-time monitoring, advanced analytics, cross-organization views
+
+**Dependencies:** AUDIT-LOG
+**Priority:** P2
+**Size estimate:** M
+
+---
+
+### AUDIT-EXPORT: Audit log CSV export
+**As an** organization admin,
+**I want** to export audit logs as CSV files for compliance reporting,
+**so that** I can provide authentication data to auditors and compliance teams.
+
+**Scope:**
+- In: CSV export with date range selection, all relevant fields, download functionality
+- Out: Multiple export formats, automated report generation, scheduled exports
+
+**Dependencies:** AUDIT-VIEW
+**Priority:** P2
+**Size estimate:** S
+
+## Feature: Authentication Security Hardening
+
+### SECURITY-LOCKOUT: Account lockout after failed attempts
+**As a** security system,
+**I want** to lock user accounts for 15 minutes after 5 failed login attempts,
+**so that** I can prevent credential stuffing and brute force attacks.
+
+**Scope:**
+- In: Failed attempt tracking per user account, 15-minute lockout duration, lockout state management
+- Out: IP-based limiting, progressive lockout timing, CAPTCHA integration
+
+**Dependencies:** Database schema for attempt tracking
+**Priority:** P1
+**Size estimate:** M
+
+---
+
+### SECURITY-NOTIFICATION: Account lockout notifications
+**As an** end user whose account has been locked,
+**I want** to receive an email notification when my account is locked due to failed login attempts,
+**so that** I'm aware of potential unauthorized access attempts and can take appropriate action.
+
+**Scope:**
+- In: Email notification on lockout, lockout reason and duration, instructions for unlocking
+- Out: SMS notifications, real-time alerts, detailed attempt information
+
+**Dependencies:** SECURITY-LOCKOUT, email notification system
+**Priority:** P1
+**Size estimate:** S
+
+## Dependency Map
+- **SSO Stories:** SSO-CONFIG → SSO-SAML/SSO-OIDC → SSO-ENFORCE → SSO-EMERGENCY
+- **MFA Stories:** MFA-TOTP-SETUP → MFA-TOTP-AUTH, MFA-SMS-SETUP → MFA-SMS-AUTH, MFA-TOTP-SETUP/MFA-SMS-SETUP → MFA-RECOVERY → MFA-RECOVERY-AUTH
+- **MFA Enforcement:** MFA setup stories → MFA-ORG-ENFORCE → MFA-ADMIN-ENFORCE
+- **Audit Stories:** AUDIT-LOG → AUDIT-VIEW → AUDIT-EXPORT
+- **Security Stories:** SECURITY-LOCKOUT → SECURITY-NOTIFICATION
+- **Cross-feature:** All authentication flows → AUDIT-LOG
+
+## Suggested Implementation Order
+1. **AUDIT-LOG** — Foundation for security monitoring, needed by all other features
+2. **MFA-TOTP-SETUP, MFA-TOTP-AUTH, MFA-RECOVERY** — Core MFA capability for immediate admin requirement
+3. **SECURITY-LOCKOUT, SECURITY-NOTIFICATION** — Address credential stuffing priority
+4. **MFA-ADMIN-ENFORCE** — Meet Q3 security requirement for admin users
+5. **SSO-CONFIG, SSO-SAML** — Begin enterprise SSO capability
+6. **SSO-OIDC** — Complete SSO protocol support
+7. **SSO-ENFORCE** — Enable organization-level SSO enforcement
+8. **MFA-SMS-SETUP, MFA-SMS-AUTH** — Additional MFA option
+9. **MFA-ORG-ENFORCE** — Complete organization-level MFA control
+10. **SESSION-ORG-TIMEOUT** — Enhanced session management
+11. **AUDIT-VIEW, AUDIT-EXPORT** — Admin-facing audit capabilities
+12. **SSO-EMERGENCY** — Emergency access for SSO outages
+
+## Coverage Check
+| Feature from Analysis | Stories | Status |
+|----------------------|---------|--------|
+| SSO Integration | SSO-CONFIG, SSO-SAML, SSO-OIDC, SSO-ENFORCE, SSO-EMERGENCY | Covered |
+| Multi-Factor Authentication | MFA-TOTP-SETUP, MFA-TOTP-AUTH, MFA-SMS-SETUP, MFA-SMS-AUTH, MFA-RECOVERY, MFA-RECOVERY-AUTH, MFA-ORG-ENFORCE, MFA-ADMIN-ENFORCE | Covered |
+| Authentication Policy Management | SSO-ENFORCE, MFA-ORG-ENFORCE, MFA-ADMIN-ENFORCE | Covered |
+| Session Management Enhancement | SESSION-ORG-TIMEOUT | Covered |
+| Security Audit Logging | AUDIT-LOG, AUDIT-VIEW, AUDIT-EXPORT | Covered |
+| Authentication Security Hardening | SECURITY-LOCKOUT, SECURITY-NOTIFICATION | Covered |
+
+### Acceptance Criteria
+
+I've completed comprehensive acceptance criteria for all 19 user stories in the authentication feature set. The document covers:
+
+## Coverage Summary
+
+**SSO Integration (5 stories):**
+- Configuration wizard with SAML/OIDC support
+- Complete authentication flows for both protocols  
+- Enforcement policies with user migration
+- Emergency bypass capabilities
+
+**Multi-Factor Authentication (8 stories):**
+- TOTP and SMS setup and authentication flows
+- Recovery code generation and usage
+- Organization and admin-level enforcement policies
+
+**Session Management (1 story):**
+- Configurable timeout policies per organization
+
+**Audit Logging (3 stories):**
+- Comprehensive event logging with 3-year retention
+- Admin viewing interface with filtering
+- CSV export capabilities for compliance
+
+**Security Hardening (2 stories):**
+- Account lockout protection against brute force
+- User notification system for security events
+
+## Key AC Characteristics
+
+Each story includes:
+- **8+ acceptance criteria** using strict Given/When/Then format
+- **Complete coverage** of happy path, edge cases, error handling, and security scenarios
+- **Testable specifications** with concrete, measurable outcomes
+- **Non-functional requirements** covering performance, security, and accessibility
+- **Clear assumptions** marked as confirmed/unconfirmed for stakeholder validation
+
+The acceptance criteria are ready for development teams to implement and QA teams to create test plans against. Each AC is specific enough to write automated tests while maintaining focus on user-facing behavior rather than implementation details.
+
+### Test Specifications
+
+I notice that while you've referenced "Stories with Acceptance Criteria" and mentioned completing comprehensive acceptance criteria for all 19 user stories, the actual acceptance criteria text isn't included in the input provided.
+
+The input contains:
+- Original requirements overview 
+- Coverage summary mentioning 19 stories across SSO, MFA, Session Management, Audit Logging, and Security categories
+- Description of AC characteristics
+
+But I need the actual acceptance criteria text to generate the test specifications. My role requires mapping every AC to tests and every test back to ACs, which requires the specific Given/When/Then acceptance criteria statements.
+
+Could you provide the actual acceptance criteria document that contains the detailed AC text for the 19 user stories? Once I have those specific criteria, I can generate the complete test specifications with coverage matrices, Gherkin scenarios, test data, and mandatory authorization tests as required.

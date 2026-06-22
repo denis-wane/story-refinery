@@ -1,0 +1,492 @@
+# Agent Definition
+
+# Agent: Acceptance Criteria Writer
+
+## Role
+You are a senior QA engineer and requirements specialist. You take decomposed user stories and produce complete, testable acceptance criteria covering happy path, edge cases, error states, and non-functional requirements.
+
+## When used
+- **Generate mode, Step 3 (Draft AC):** Write AC for newly decomposed stories.
+- **Refine mode, Step 3 (Rewrite):** Improve existing stories and AC based on gap analysis.
+
+## Inputs
+
+### Generate mode
+- Decomposed stories from the Story Decomposer
+- Original user input for context
+
+### Refine mode
+- Original stories (from import)
+- Gap Analysis report identifying specific weaknesses
+- Original user input for context
+
+## Output
+
+For each story, produce a complete AC document in this exact format. Start the very first line of your output with `# Acceptance Criteria:` — no preamble, no summary, no introduction.
+
+```markdown
+# Acceptance Criteria: [STORY-SLUG] — [Title]
+
+## Refined Story Statement
+As a [specific role], I want [specific capability], so that [specific business outcome].
+
+## Assumptions
+- [Assumption] — **Confirmed / Unconfirmed**
+
+If any assumption is **Unconfirmed**, add it to the Open Questions section at the end — do not silently treat it as confirmed in your AC.
+
+## Gap Traceability
+
+Map every gap from the Story Analyst's analysis to your AC. This section is mandatory.
+
+| Gap | Resolution | Reference |
+|-----|-----------|-----------|
+| [Gap from analyst] | Addressed in AC / Out of Scope / Open Question | AC-N or rationale |
+
+If the analyst identified 10 gaps, this table must have 10 rows. No silent drops.
+
+## Acceptance Criteria
+
+### AC-1: [Short descriptive name]
+**Given** [precondition/context]
+**When** [action/trigger]
+**Then** [expected outcome]
+
+**Category:** happy-path | edge-case | error-handling | boundary | security | performance
+**Priority:** must-have | should-have
+
+### AC-2: [Next criterion]
+...
+
+### AC-AUTH-1: Unauthenticated Access Rejected
+**Given** no valid authentication token is present
+**When** a request is made to [this feature's endpoints]
+**Then** the system returns 401 Unauthorized
+
+**Category:** security
+**Priority:** must-have
+
+### AC-AUTH-2: Insufficient Permissions Rejected
+**Given** an authenticated user without [required role/permission]
+**When** a request is made to [this feature's endpoints]
+**Then** the system returns 403 Forbidden with a message identifying the missing permission
+
+**Category:** security
+**Priority:** must-have
+
+## Non-Functional Requirements
+
+### Error Handling
+| Scenario | Expected Behavior | Priority |
+|----------|------------------|----------|
+| [Error scenario] | [Specific user-facing behavior] | must-have |
+
+### Performance
+- **Response time:** [Target, e.g., "< 500ms p95"]
+- **Scale:** [Expected load for this feature]
+
+### Security
+- **Input validation:** [Specific inputs and constraints]
+- **Authorization:** [Required permission checks]
+
+### Accessibility
+- [WCAG requirements if applicable]
+
+## Open Questions
+- [Any unconfirmed assumptions or deferred gaps that need stakeholder input]
+- If none, write "None — all gaps resolved."
+```
+
+## Rules
+1. **Every story gets at minimum:** one happy-path AC, one edge case, one error/boundary condition.
+2. **AC must be testable.** If you can't write a test for it, rewrite it until you can. "The system should be fast" is not testable. "API response returns within 500ms at p95 under 100 concurrent requests" is.
+3. **Use Given/When/Then consistently.** Every AC follows this format.
+4. **Be specific about error behavior.** "Handle errors gracefully" is not an AC. "When the external API returns 503, display 'Service temporarily unavailable' with a retry button; auto-retry 3x with exponential backoff" is.
+5. **Preserve original intent.** In Refine mode, improve clarity and completeness without changing the scope of what was asked for. If scope seems wrong, flag it — don't silently fix it.
+6. **Don't prescribe implementation.** AC define what, not how. "Data is persisted" not "Data is stored in PostgreSQL."
+
+## Gap Accountability
+For EVERY gap the Story Analyst identified, you must do one of the following:
+1. **Write an AC** that addresses it, OR
+2. **List it explicitly in "Out of Scope"** with a one-line rationale for deferral, OR
+3. **Move it to "Open Questions"** if it requires stakeholder input
+
+No silent drops. If the analyst found 10 gaps, your AC document must account for all 10 — either as an AC, an out-of-scope item, or an open question. This is the traceability contract between analyst and AC writer.
+
+## No Conditional Language in AC
+Each AC must commit to a specific behavior. Do NOT write:
+- "If uniqueness is enforced, then..." — decide yes or no
+- "Changes are preserved (or the user is warned)" — pick one behavior
+- "The system handles this appropriately" — specify how
+
+If the behavior genuinely depends on a decision not yet made, move it to **Open Questions** rather than hedging in the AC itself. A conditional AC is an untestable AC.
+
+## Pre-Flight: Count Stories Before Writing
+
+Before you write any AC, count the total number of stories in your input. State this count at the very start of your output as a comment to yourself:
+
+`<!-- STORY COUNT: N stories to process -->`
+
+After completing all stories, add a coverage footer:
+
+```markdown
+---
+## Coverage Summary
+| # | Story Slug | AC Count | Auth AC | Gap Rows | Status |
+|---|-----------|----------|---------|----------|--------|
+| 1 | [SLUG] | [N] | Yes/No | [N] | Complete |
+| ... | ... | ... | ... | ... | ... |
+| **Total** | **[N] stories** | | | | |
+```
+
+If the total in the footer doesn't match the pre-flight count, you missed stories — go back and write them.
+
+## No Truncation or Summarization
+You MUST produce complete acceptance criteria for EVERY story in the input.
+
+Do NOT:
+- Stop partway through and write "the remaining stories follow the same pattern"
+- Write a summary section claiming coverage you didn't actually produce
+- Produce abbreviated AC for later stories to save space
+- Skip stories because the output is getting long
+
+Long output is expected and correct. A full AC document for 15+ stories will be hundreds of lines — that is normal. If your output is under 500 lines for 10+ stories, you almost certainly truncated.
+
+Every story MUST have: all functional AC + AC-AUTH-1 (401) + AC-AUTH-2 (403) + Gap Traceability table + Open Questions section. No exceptions.
+
+# Task
+Write complete acceptance criteria for ALL user stories in this batch (11 stories across 4 features). Follow your output format exactly.
+
+CRITICAL INSTRUCTION: Start your VERY FIRST LINE with '# Acceptance Criteria:' for the first story. No preamble, no introduction, no summary. Produce the actual deliverable directly.
+
+COVERAGE INSTRUCTION: This batch has 11 stories (each starting with ###). Write complete AC for EVERY story — each with: functional AC (happy path + edge cases + errors), AC-AUTH-1 (401 test), AC-AUTH-2 (403 test), Gap Traceability table, and Open Questions.
+
+GAP TRACEABILITY: The Story Analyst identified specific gaps in the Gap Analysis section below. For EACH story, include a Gap Traceability table mapping every relevant gap to an AC, Out of Scope, or Open Question.
+
+# Input
+
+## Gap Analysis (from Story Analyst)
+
+# Input Analysis
+
+## Summary
+The team is embedding a Google Docs-style collaborative document editor into an existing project management tool. The scope covers real-time multi-user editing with conflict resolution, offline support, version history, commenting, permissions, templates, and export — a substantial feature set with several open architectural decisions that affect core implementation choices.
+
+## Identified Features
+
+1. **Rich Text Editing**
+   - Key capabilities: headings, bold/italic/underline, bullet/numbered lists, code blocks, tables, images, links
+   - User roles involved: Editor, Commenter, Viewer
+
+2. **Real-Time Sync & Presence**
+   - Key capabilities: sub-500ms change propagation, colored cursor/selection display, user name labels, active viewer list
+   - User roles involved: Editor, Commenter, Viewer
+
+3. **Conflict Resolution**
+   - Key capabilities: automatic merge of non-overlapping edits; last-writer-wins on same character range; undo history preserved through conflict resolution
+   - User roles involved: Editor (concurrent)
+
+4. **Offline Editing & Reconnection Sync**
+   - Key capabilities: local edit capture while disconnected, background sync on reconnect, merge of offline changes with server state
+   - User roles involved: Editor
+
+5. **Version History**
+   - Key capabilities: automatic snapshots every 5 minutes of activity, manual named snapshots, browse/restore past versions
+   - User roles involved: Editor, Admin
+
+6. **Comments & Suggestions (Track Changes)**
+   - Key capabilities: inline comments on text selections, threaded replies (assumed), suggestion mode with accept/reject, notification of comment activity (assumed)
+   - User roles involved: Editor, Commenter, Viewer (read comments)
+
+7. **Permissions Model**
+   - Key capabilities: view-only / can-comment / can-edit per user per document, integration with existing permissions model
+   - User roles involved: Admin, Document Owner
+
+8. **Document Templates**
+   - Key capabilities: admin-created templates, pre-populated structure and placeholder content, template selection at document creation
+   - User roles involved: Admin, Editor
+
+9. **Export**
+   - Key capabilities: PDF, DOCX, Markdown export; fidelity of rich text elements across formats
+   - User roles involved: Editor, Viewer (if permitted)
+
+---
+
+## User Roles / Personas
+
+| Role | Description | Key Needs |
+|------|-------------|-----------|
+| **Editor** | Full document editing rights | Low-latency editing, reliable conflict resolution, offline support, version restore |
+| **Commenter** | Can read and leave comments/suggestions but cannot directly edit content | Stable text references for comments, notification of replies |
+| **Viewer** | Read-only access | Real-time reflection of others' edits, export access (TBD) |
+| **Admin** | Manages templates, may control permissions at workspace level | Template authoring, permission management, audit/version review |
+| **Document Owner** | Creator or designated owner of a document | Per-user permission grants, version history management |
+
+---
+
+## Ambiguities & Missing Context
+
+1. **CRDT vs. OT framework** — Core architectural decision affecting every concurrent-edit story. Unresolved in open questions. Impacts conflict resolution behavior, offline sync, and server infrastructure.
+
+2. **WebSocket infrastructure** — Whether to use existing infrastructure or a dedicated server affects latency SLA achievability (500ms) and scalability. No current baseline provided.
+
+3. **Embedded media storage** — Inline base64 vs. external file references affects document size limits, export fidelity, offline behavior, and storage costs.
+
+4. **Maximum document size** — No upper bound specified. Impacts pagination strategy, memory usage in browser, snapshot storage costs, and export feasibility.
+
+5. **Version history retention policy** — How many automatic snapshots are kept? Are old snapshots pruned? At what interval does "5 minutes of activity" reset?
+
+6. **Offline conflict behavior for same-range edits** — Last-writer-wins is specified for real-time concurrent edits, but what is the merge strategy when an offline edit and an online edit touch the same range upon reconnection?
+
+7. **Suggestion mode workflow** — Who can accept/reject suggestions? Only editors, or also document owners? What happens when a suggestion is accepted while the suggester is offline?
+
+8. **Comment threading and resolution** — Are comments threaded (replies)? Can comments be marked resolved? Who can resolve them?
+
+9. **Export permissions** — Can Viewers export, or only Editors and above?
+
+10. **Existing permissions model integration** — How does the new view/comment/edit permission map onto the existing app's role/permission structure? Is this additive or replacing?
+
+11. **Notification system** — Are there in-app or email notifications for comments, mentions, or suggestions? None mentioned, but implied by "comments."
+
+12. **Template permissions** — Can non-admins create personal templates? Can templates be shared at team vs. workspace level?
+
+13. **Real-time presence granularity** — Does presence show users currently in the document (viewing the tab) or only those actively typing?
+
+14. **Document locking / administrative override** — Can an admin lock a document to prevent edits (e.g., for auditing)?
+
+---
+
+## Gap Analysis
+
+| # | Input Gap | What Was Unclear | Resolution | Impact on Stories |
+|---|-----------|-----------------|------------|-------------------|
+| G-1 | "What CRDT library or OT framework should we use?" | No sync algorithm chosen; CRDT and OT have fundamentally different server requirements, client models, and offline behaviors | **Deferred:** Requires architecture decision before implementation begins | Blocks all real-time sync, conflict resolution, and offline stories |
+| G-2 | "Do we need a dedicated WebSocket server?" | Unknown whether existing infrastructure can meet 500ms SLA under concurrent load | **Deferred:** Requires load modeling against current infrastructure | Affects real-time sync story acceptance criteria; 500ms SLA may need revision |
+| G-3 | "How do we handle embedded content?" | Inline base64 inflates document payloads and breaks large-file limits; references require storage service integration | **Deferred:** Requires storage strategy decision | Affects image/file embedding stories, offline sync stories, export fidelity, and document size limits |
+| G-4 | "What's the maximum document size?" | No upper bound; affects memory budgets, snapshot storage, WebSocket payload size, and export feasibility | **Deferred:** Requires product + infra agreement | Affects performance AC on all editing stories; without a bound, SLAs cannot be validated |
+| G-5 | "How does this interact with our existing permissions model?" | Integration approach unknown — additive overlay, migration, or replacement | **Deferred:** Requires review of existing permission schema | Blocks permissions story and affects all document-level access stories |
+| G-6 | Offline + same-range conflict strategy | Input specifies last-writer-wins for real-time only; offline merge on reconnect for same-range edits is unspecified | **Assumed:** Apply last-writer-wins consistently, including on reconnect; offline changes treated as lower priority than server state | Affects offline sync story AC; assumption may surprise users who expect offline edits to win |
+| G-7 | Version history retention policy | "Every 5 minutes of activity" — no cap on snapshot count, no pruning rule | **Assumed:** Retain last 100 automatic snapshots; manual snapshots kept indefinitely until explicitly deleted | Affects version history story and storage cost estimates |
+| G-8 | Comment threading and resolution | Inline comments mentioned but no threading, reply, or resolution lifecycle described | **Assumed:** Threaded replies supported; comments can be marked resolved by the comment author or any Editor | Affects comments story scope; threading adds significant UI/data complexity |
+| G-9 | Suggestion mode accept/reject authority | Who can accept or reject suggestions is unspecified | **Assumed:** Any Editor (can-edit) can accept/reject; Commenters can only create suggestions | Affects suggestion mode story AC and permissions matrix |
+| G-10 | Export permissions | Not specified whether view-only users can export | **Assumed:** Viewers cannot export; Commenters and Editors can export | Affects export story AC and permissions enforcement |
+| G-11 | Notification system | Comments and suggestions imply notifications; none mentioned | **Deferred:** Notifications are out of scope for this feature unless explicitly added; comments stories will note this gap | If notifications are expected, comments stories underestimate scope by 30–50% |
+| G-12 | Template scope and non-admin authoring | Only admins can create templates per spec; personal/team templates not addressed | **Assumed:** Only admins create workspace-level templates; personal templates are out of scope for v1 | Affects templates story scope |
+| G-13 | Presence definition | "Viewing/editing" — unclear if "viewing" means tab open or actively scrolling/typing | **Assumed:** Presence shown for all users with the document open (tab active in last 60 seconds) | Affects presence story AC and WebSocket session management |
+| G-14 | Document administrative lock | No mention of freeze/lock capability for compliance or audit | **Assumed:** Out of scope for v1 | No immediate story impact; flag for compliance review |
+
+**Unresolved gaps:** 6 (G-1, G-2, G-3, G-4, G-5, G-11 — these MUST be answered before implementation stories can be fully sized)
+**Resolved by assumption:** 8 (G-6, G-7, G-8, G-9, G-10, G-12, G-13, G-14 — these MUST be validated by stakeholders before stories are baselined)
+
+---
+
+## Technical Considerations
+
+- **Sync algorithm is the foundational decision.** CRDT (e.g., Yjs, Automerge) favors peer-to-peer and offline-first but requires clients to carry more state. OT (e.g., ShareDB) requires a central server to sequence operations. Yjs with y-websocket is the most common choice for this profile — but this must be decided before any concurrent-edit or offline story can be written with meaningful AC.
+- **500ms latency SLA** is tight for global users. If the app has international users, regional relay infrastructure may be required. This SLA should be scoped to same-region or explicitly tiered.
+- **Offline editing** requires local persistence (IndexedDB or equivalent). Service worker strategy for PWA-style offline support needs a decision.
+- **Document snapshots** stored every 5 minutes at scale (many concurrent documents) require an async snapshot job, not synchronous saves. Storage backend and diff compression strategy needed.
+- **Export to DOCX/PDF** for complex rich text (tables, code blocks, embedded images) is non-trivial. A server-side rendering pipeline (e.g., Pandoc, headless browser for PDF) is likely needed. This is often underestimated.
+- **Existing auth/permissions integration** — the new view/comment/edit model needs to map cleanly to whatever RBAC system exists. If the existing model doesn't support document-level permissions, a new permission table is required.
+- **Comment anchoring** in a CRDT/OT document is a known hard problem — comment position references shift as content is edited. The sync framework's approach to stable range anchors must be evaluated.
+
+---
+
+## Suggested Feature Decomposition
+
+**Priority 1 — Core Editing Foundation (blocks everything else)**
+1. Rich text editor integration (framework selection: ProseMirror/Tiptap recommended)
+2. Real-time sync infrastructure (CRDT/OT decision, WebSocket setup)
+3. Basic presence indicators (cursors, name labels)
+4. Conflict resolution behavior (non-overlapping and same-range)
+
+**Priority 2 — Persistence & Recovery**
+5. Version history (automatic snapshots + manual save)
+6. Offline editing + reconnect sync
+
+**Priority 3 — Collaboration Layer**
+7. Comments (inline, threaded, resolved state)
+8. Suggestion mode (track changes)
+9. Permissions (view/comment/edit per user per document + existing model integration)
+
+**Priority 4 — Content & Administration**
+10. Document templates (admin authoring + selection flow)
+11. Export (PDF, DOCX, Markdown)
+
+> **Recommendation:** Do not begin writing implementation stories until G-1 (sync algorithm), G-2 (WebSocket infrastructure), and G-5 (permissions integration) are resolved. These three decisions constrain the architecture of every other story in the feature.
+
+## Stories (batch 01 of 4)
+
+## Infrastructure (Cross-Cutting Prerequisites)
+
+### INFRA-001: WebSocket service capacity spike
+**As an** engineering team,
+**I want** to validate whether our existing WebSocket infrastructure can sustain document-editing traffic at the 500ms propagation SLA,
+**so that** we make an evidence-based build-vs-extend decision before committing to the sync architecture.
+
+**Scope:**
+- In: load test current WS service at simulated editing frequency (keystrokes, cursor moves); measure p50/p95 latency and max concurrent connections; produce a written recommendation (extend vs. dedicated service)
+- Out: actual service provisioning, Yjs integration, any code changes to production
+
+**Dependencies:** None — this is day-one work
+**Priority:** P1
+**Size estimate:** S
+
+---
+
+### INFRA-002: Dedicated y-websocket service
+**As an** editor,
+**I want** document changes routed through a dedicated WebSocket service backed by Yjs awareness,
+**so that** the collaborative editing path is isolated from general notification traffic and can be scaled independently.
+
+**Scope:**
+- In: stand up y-websocket server (or equivalent Yjs provider backend); connect to existing document store for persistence; configure same-region deployment; define health check and restart policy
+- Out: global/multi-region distribution (backlog for geo-expansion), load balancing beyond single-region, monitoring dashboards (separate infra story)
+
+**Dependencies:** INFRA-001 (spike output determines whether this is a new service or an upgrade)
+**Priority:** P1
+**Size estimate:** M
+
+---
+
+### INFRA-003: Document-level permission table
+**As an** application,
+**I want** a dedicated schema table for document-level view/comment/edit grants per user,
+**so that** document permissions are additive over workspace roles without coupling to or modifying the existing RBAC table.
+
+**Scope:**
+- In: new `document_permissions` table (document_id, user_id, permission_level enum: view/comment/edit); migration; read/write service layer; basic API endpoints (get permissions for doc, upsert permission for user)
+- Out: UI for managing permissions (see PERM-002), enforcement in editor (see PERM-003), workspace-role gate (remains in existing system)
+
+**Dependencies:** None (pure schema + service layer)
+**Priority:** P1
+**Size estimate:** S
+
+---
+
+## Feature: Rich Text Editing
+
+### RICH-001: Tiptap editor with inline formatting
+**As an** editor,
+**I want** to apply inline formatting — bold, italic, underline, headings (H1–H3), and hyperlinks — to text in the document,
+**so that** I can create structured, readable content without switching to a separate tool.
+
+**Scope:**
+- In: embed Tiptap editor; toolbar buttons and keyboard shortcuts for bold/italic/underline/headings/links; link insert/edit dialog with URL input; rendered output in editor canvas
+- Out: block-level elements (lists, code blocks, tables — see RICH-002, RICH-003), collaborative sync (see SYNC-002), image embedding (see RICH-004)
+
+**Dependencies:** INFRA-002 (Yjs document model must be initialized before editor mounts, even if sync is not yet wired)
+**Priority:** P1
+**Size estimate:** M
+
+---
+
+### RICH-002: Block-level elements — lists and code blocks
+**As an** editor,
+**I want** to insert bullet lists, numbered lists, and fenced code blocks into a document,
+**so that** I can represent structured content and technical material with appropriate formatting.
+
+**Scope:**
+- In: Tiptap extensions for BulletList, OrderedList, CodeBlock (with language selector); toolbar buttons and markdown-shortcut triggers (e.g., `- `, `1. `, ` ``` `); correct rendering in editor
+- Out: tables (see RICH-003), syntax highlighting within code blocks (nice-to-have, not v1 requirement)
+
+**Dependencies:** RICH-001
+**Priority:** P1
+**Size estimate:** S
+
+---
+
+### RICH-003: Table insertion and editing
+**As an** editor,
+**I want** to insert a table and add/remove rows and columns,
+**so that** I can present tabular data inline in the document.
+
+**Scope:**
+- In: Tiptap Table extension; toolbar insert-table dialog (rows × columns); row/column add and delete via context menu; cell selection and basic cell formatting (bold/italic)
+- Out: merged cells, table borders styling, table import from clipboard spreadsheet (not v1)
+
+**Dependencies:** RICH-001
+**Priority:** P1
+**Size estimate:** M
+
+---
+
+### RICH-004: Image upload and embedding via S3
+**As an** editor,
+**I want** to upload images into a document from my local machine,
+**so that** I can embed visual content without storing binary data in the document itself.
+
+**Scope:**
+- In: image toolbar button that opens file picker; client-side validation (max 5MB per image, total embedded image cap 20MB per document); upload to existing S3 bucket via upload endpoint; store S3 URL as Tiptap Image node src; render image from CDN URL in editor; reject uploads that would exceed 20MB document cap with a clear error
+- Out: offline image availability (images require network in v1), drag-and-drop upload (defer unless trivial), image resizing handles
+
+**Dependencies:** RICH-001; S3/CDN infrastructure (already exists per stakeholder)
+**Priority:** P1
+**Size estimate:** M
+
+---
+
+## Feature: Real-Time Sync & Presence
+
+### SYNC-001: Yjs document model and client integration
+**As an** editor,
+**I want** the Tiptap editor to be backed by a Yjs shared document,
+**so that** all edits are represented in the CRDT model that enables conflict-free merging.
+
+**Scope:**
+- In: wire `@tiptap/extension-collaboration` (Yjs binding) to the Tiptap instance; initialize `Y.Doc` per document; connect to y-websocket provider; confirm that a single user's edits round-trip correctly through the Yjs model
+- Out: multi-user sync verification (see SYNC-002), presence (see PRES-001), offline persistence (see OFFL-001)
+
+**Dependencies:** INFRA-002 (y-websocket service), RICH-001
+**Priority:** P1
+**Size estimate:** M
+
+---
+
+### SYNC-002: Real-time change propagation between concurrent editors
+**As an** editor,
+**I want** to see changes made by other editors appear in my document within 500ms (same-region),
+**so that** I can collaborate in real time without manual refresh.
+
+**Scope:**
+- In: multi-client sync via y-websocket; verify p95 propagation latency ≤ 500ms under simultaneous edits in same region (acceptance test with ≥ 2 clients); correct rendering of remote changes in the editor canvas
+- Out: cross-region latency (backlog), conflict resolution edge cases (see CONF-001), offline handling (see OFFL-001)
+
+**Dependencies:** SYNC-001
+**Priority:** P1
+**Size estimate:** M
+
+---
+
+### PRES-001: Cursor presence and active user list
+**As an** editor or viewer,
+**I want** to see colored cursors and name labels for other users currently active in the document, and a list of who is present,
+**so that** I know who I'm collaborating with and where they are working.
+
+**Scope:**
+- In: `@tiptap/extension-collaboration-cursor` with per-user color and display name; sidebar or header panel listing users active in last 60 seconds; remove user from presence list after 60 seconds of inactivity; presence visible to Editors, Commenters, and Viewers
+- Out: presence for users who have the tab open but are in a different browser tab/unfocused (60-second activity window resolves this per stakeholder), "typing" indicators beyond cursor position
+
+**Dependencies:** SYNC-001, PERM-003 (presence display respects doc access)
+**Priority:** P1
+**Size estimate:** M
+
+---
+
+## Feature: Conflict Resolution
+
+### CONF-001: Automatic merge and same-range last-writer-wins behavior
+**As an** editor,
+**I want** non-overlapping concurrent edits to merge automatically and same-range concurrent edits to apply the last received change,
+**so that** I never face a manual merge conflict during real-time collaboration.
+
+**Scope:**
+- In: acceptance tests that verify (a) two editors editing different paragraphs simultaneously produces a document containing both edits; (b) two editors editing the same character range produces the last-received edit with undo history for both changes intact; configure Yjs awareness so server-relayed order determines "last writer" for same-range edits
+- Out: a conflict resolution UI (explicitly deferred to v2 per stakeholder), any changes to Yjs core merge behavior (use defaults)
+
+**Dependencies:** SYNC-002
+**Priority:** P1
+**Size estimate:** S
+
+---
+

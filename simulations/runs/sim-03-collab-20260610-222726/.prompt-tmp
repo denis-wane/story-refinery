@@ -1,0 +1,147 @@
+# Agent Definition
+
+# Agent: Stakeholder Simulator
+
+## Role
+You are a simulated product owner / stakeholder used in pipeline testing. Given a set of clarifying questions and the original project input, you provide realistic, internally consistent answers that a real stakeholder would give. You are pragmatic, slightly opinionated, and occasionally add useful context that wasn't in the original input.
+
+## When used
+- **Simulation only.** This agent is never part of the production pipeline. It stands in for a human during automated test runs.
+
+## Inputs
+- Original project input (the raw feature description)
+- Clarifying questions from the Clarifier agent
+
+## Output
+
+```markdown
+# Stakeholder Responses
+
+## Critical Questions
+### 1. [Question title — copied from the Clarifier output]
+**Answer:** [Direct answer]
+**Additional context:** [Optional — extra detail a real stakeholder might volunteer]
+
+### 2. ...
+
+## Important Questions
+### 1. ...
+
+## Nice to Have
+### 1. ...
+
+## Assumptions Review
+| # | Assumption | Verdict | Notes |
+|---|-----------|---------|-------|
+| 1 | [Assumption text] | ✅ Correct / ❌ Wrong / ⚠️ Partially | [Correction or confirmation] |
+| 2 | ... | | |
+```
+
+## Rules
+1. **Stay in character.** You are a product owner, not an engineer. Give business answers, not technical solutions. Say "we need it to work with Okta" not "use SAML 2.0 with SHA-256 signing."
+2. **Be decisive.** Real stakeholders pick a direction. Don't hedge with "it depends" — pick the most reasonable option and state it clearly.
+3. **Be consistent with the input.** Your answers must not contradict the original project description. You can add detail, but not change requirements.
+4. **Volunteer useful context.** Occasionally add a detail a real stakeholder would mention ("oh, and we also need to support..." or "FYI, the security team already approved..."). Keep this realistic — 1-2 additions, not a wishlist.
+5. **Correct assumptions when appropriate.** In the Assumptions Review, mark ~80% as correct and flag 1-2 as wrong or partially wrong to test the pipeline's ability to adapt.
+
+# Task
+You are the product owner for this project. Answer all clarifying questions below based on the original project input. Be decisive and realistic.
+IMPORTANT: Output the actual stakeholder responses directly. Do NOT describe what you would do — produce the deliverable itself.
+
+# Input
+
+## Original Project Description
+
+# Feature: Real-Time Collaborative Document Editing
+
+## Overview
+We're building a collaborative document editor into our project management tool. Multiple users should be able to edit the same document simultaneously, see each other's cursors and selections, and have changes merge automatically without conflicts. Think Google Docs-style experience but embedded in our existing app.
+
+## Requirements
+- Rich text editing: headings, bold/italic/underline, bullet lists, numbered lists, code blocks, tables, images, links
+- Real-time sync: changes appear on other users' screens within 500ms
+- Presence indicators: show who else is viewing/editing the document, with colored cursors and name labels
+- Conflict resolution: concurrent edits to different parts of the document merge automatically; concurrent edits to the same character range use last-writer-wins with undo history preserved
+- Offline support: users can edit while disconnected; changes sync and merge when reconnected
+- Version history: automatic snapshots every 5 minutes of activity, plus manual "save version" with optional name
+- Comments and suggestions: inline comments on text selections, suggestion mode (track changes style)
+- Permissions: view-only, can-comment, can-edit per user per document
+- Document templates: admins can create templates that pre-populate structure and placeholder content
+- Export: PDF, DOCX, Markdown
+
+## Open Questions
+- What CRDT library or OT framework should we use?
+- Do we need a dedicated WebSocket server or can we use our existing infrastructure?
+- How do we handle documents with embedded content (images, files) — inline base64 or reference to file storage?
+- What's the maximum document size we need to support?
+- How does this interact with our existing permissions model?
+
+## Clarifying Questions
+
+# Clarifying Questions
+
+## Critical (must answer before proceeding)
+
+1. **Integration with existing project management data model**
+   How should collaborative documents relate to your existing projects, tasks, and file attachments? Should documents be linked to specific projects/tasks, or exist as standalone entities accessible across the organization?
+   - _Why it matters:_ Determines the data model, navigation patterns, and permission inheritance strategy
+   - _Default assumption if unanswered:_ Documents exist independently with manual access control, no automatic project/task associations
+
+2. **Embedded content storage architecture**
+   For images and file attachments within documents, should content be stored inline (base64) or as separate file references with your existing file storage system?
+   - _Why it matters:_ Fundamentally affects document portability, storage costs, sync performance, and offline capabilities
+   - _Default assumption if unanswered:_ File references to existing storage system, with placeholder text when files unavailable offline
+
+3. **Browser and accessibility requirements**
+   What browsers (minimum versions) and devices must be supported? Are there specific accessibility standards (WCAG level) that must be met?
+   - _Why it matters:_ Affects technology choices for rich text editor, determines polyfill requirements, and compliance testing scope
+   - _Default assumption if unanswered:_ Modern browsers only (Chrome 90+, Firefox 88+, Safari 14+), desktop-first design, basic accessibility
+
+4. **Document and concurrency limits**
+   What's the maximum document size and maximum concurrent editors per document that the system needs to handle?
+   - _Why it matters:_ Affects architecture choices between CRDT vs OT, WebSocket scaling requirements, and performance optimization strategy
+   - _Default assumption if unanswered:_ 50MB maximum document size, 20 concurrent editors per document
+
+## Important (strongly recommended)
+
+1. **Export permission model**
+   Should export functionality (PDF, DOCX, Markdown) be available to view-only users, or require edit permissions? Should export permissions be separately configurable?
+   - _Why it matters:_ Affects permission system design and potential data leak prevention requirements
+   - _Default assumption if unanswered:_ Export available to all users with view permissions or higher
+
+2. **Notification and awareness preferences**
+   Should users receive notifications for document changes, @mentions in comments, or suggestion requests? Should this be configurable per user/document?
+   - _Why it matters:_ Determines notification system integration requirements and user preference management
+   - _Default assumption if unanswered:_ Basic in-app notifications only, no email/push notifications, minimal user configuration
+
+3. **Document organization and discovery**
+   How should documents be organized - folder structure, tagging, search across content? How do users discover documents they have access to?
+   - _Why it matters:_ Affects navigation design, search infrastructure requirements, and user onboarding flow
+   - _Default assumption if unanswered:_ Flat document list with basic search by title, no folders or tags
+
+4. **Comment workflow and resolution**
+   Should comments have resolution states (open/resolved)? Should suggestion mode changes require explicit acceptance/rejection, or just edit the document directly?
+   - _Why it matters:_ Determines comment data model complexity and collaboration workflow patterns
+   - _Default assumption if unanswered:_ Comments are simple threads without resolution states, suggestions are direct edits with undo history
+
+## Nice to Have (will use reasonable defaults)
+
+1. **Template sharing and permissions**
+   Should document templates be organization-wide, or can individual users/teams create and share their own templates?
+   - _Why it matters:_ Affects template management UI complexity and permission system scope
+   - _Default assumption if unanswered:_ Only admins can create templates, all users can use any template
+
+2. **Performance degradation handling**
+   How should the system behave when performance targets (500ms sync) can't be met due to document size or server load?
+   - _Why it matters:_ Determines monitoring requirements and user experience fallback strategies
+   - _Default assumption if unanswered:_ Show performance warnings, continue best-effort sync without blocking editing
+
+## Assumptions Being Made
+
+_These are interpretations the analysis has already made. Flag any that are wrong._
+
+1. **Last-writer-wins conflict resolution** — Analysis assumes this simple strategy rather than more sophisticated merge algorithms
+2. **Automatic 5-minute snapshots** — Analysis assumes version history timing based on activity rather than calendar intervals or manual triggers
+3. **Project manager role elevation** — Analysis suggests PMs might need special permissions, but this wasn't explicitly stated in requirements
+4. **Admin-controlled templates only** — Analysis assumes centralized template management rather than user-generated content
+5. **Embedded editor integration** — Analysis assumes the editor launches within existing PM tool interface rather than as a separate application

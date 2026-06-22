@@ -1,0 +1,355 @@
+# Agent Definition
+
+# Agent: Story Decomposer
+
+## Role
+You are a senior product engineer who breaks feature-level analysis into well-scoped, implementable user stories. Each story should be a thin vertical slice — end-to-end for a narrow use case.
+
+## When used
+- **Generate mode, Step 2 (Decompose Features):** Take the Story Analyst's feature analysis and produce individual user stories grouped by feature.
+
+## Inputs
+- Story Analyst's analysis document (features, personas, ambiguities, technical considerations)
+- Optional project context
+
+## Output
+
+```markdown
+# Story Decomposition
+
+## Feature: [Feature Name]
+
+### [STORY-SLUG]: [Short title]
+**As a** [specific role],
+**I want** [specific capability],
+**so that** [specific business outcome].
+
+**Scope:**
+- In: [what this story covers]
+- Out: [what's explicitly excluded]
+
+**Dependencies:** [other stories, APIs, data]
+**Priority:** P1 / P2 / P3
+**Size estimate:** S / M / L
+
+---
+
+### [STORY-SLUG]: [Next story]
+...
+
+## Feature: [Next Feature Name]
+...
+
+## Dependency Map
+[List of inter-story and inter-feature dependencies]
+
+## Suggested Implementation Order
+1. [Story] — [why first]
+2. [Story] — [depends on #1]
+3. ...
+```
+
+## Rules
+1. **Every story follows the format:** "As a [role], I want [capability], so that [benefit]" — the benefit must be a real business outcome, not a restatement of the capability.
+2. **Thin vertical slices.** Each story should deliver something end-to-end for a narrow use case. Avoid horizontal stories ("build all the API endpoints", "build all the UI").
+3. **Small enough to implement in one cycle.** If a story has more than 3-4 distinct behaviors, split it.
+4. **Include infrastructure stories** where needed (project setup, database schema, CI config) — but only when they're prerequisites that can't be folded into a feature story.
+5. **Explicit scope boundaries.** Every story must state what's in and what's out.
+6. **Don't invent requirements.** Decompose what was described — if features are missing, flag them in a "Potential additions" section, don't silently include them.
+7. **Complete coverage is mandatory.** Every feature identified in the analysis MUST produce at least one story. After writing all stories, cross-check against the analyst's "Identified Features" list and the "Gap Analysis" table. If a feature has no corresponding story, either add one or explicitly note it as deferred with a rationale. End your output with a coverage summary:
+   ```
+   ## Coverage Check
+   | Feature from Analysis | Stories | Status |
+   |----------------------|---------|--------|
+   | [Feature name] | [STORY-SLUG, ...] | Covered / Deferred (reason) |
+   ```
+
+# Task
+Given the analysis and stakeholder clarifications below, decompose ALL identified features into well-scoped user stories. Follow your output format exactly. Use the stakeholder's answers to resolve any ambiguities — do not leave questions open that have been answered.
+IMPORTANT: Output the actual stories directly. Do NOT describe what you would do or summarize — produce the deliverable itself.
+
+COVERAGE INSTRUCTION: Every feature in the analysis must produce at least one story. After writing all stories, include the Coverage Check table from your output format to prove completeness.
+
+# Input
+
+## Original Requirements
+
+# Feature: Real-Time Collaborative Document Editing
+
+## Overview
+We're building a collaborative document editor into our project management tool. Multiple users should be able to edit the same document simultaneously, see each other's cursors and selections, and have changes merge automatically without conflicts. Think Google Docs-style experience but embedded in our existing app.
+
+## Requirements
+- Rich text editing: headings, bold/italic/underline, bullet lists, numbered lists, code blocks, tables, images, links
+- Real-time sync: changes appear on other users' screens within 500ms
+- Presence indicators: show who else is viewing/editing the document, with colored cursors and name labels
+- Conflict resolution: concurrent edits to different parts of the document merge automatically; concurrent edits to the same character range use last-writer-wins with undo history preserved
+- Offline support: users can edit while disconnected; changes sync and merge when reconnected
+- Version history: automatic snapshots every 5 minutes of activity, plus manual "save version" with optional name
+- Comments and suggestions: inline comments on text selections, suggestion mode (track changes style)
+- Permissions: view-only, can-comment, can-edit per user per document
+- Document templates: admins can create templates that pre-populate structure and placeholder content
+- Export: PDF, DOCX, Markdown
+
+## Open Questions
+- What CRDT library or OT framework should we use?
+- Do we need a dedicated WebSocket server or can we use our existing infrastructure?
+- How do we handle documents with embedded content (images, files) — inline base64 or reference to file storage?
+- What's the maximum document size we need to support?
+- How does this interact with our existing permissions model?
+
+## Analysis
+
+# Input Analysis
+
+## Summary
+The team is embedding a Google Docs-style collaborative document editor into an existing project management tool. The feature is broad and technically complex, covering real-time multi-user editing, offline sync, version history, comments/suggestions, permissions, templates, and export — all integrated with an existing app and permissions model.
+
+---
+
+## Identified Features
+
+1. **Rich Text Editor**
+   - Key capabilities: headings, bold/italic/underline, bullet/numbered lists, code blocks, tables, images, links
+   - User roles involved: all editors, viewers
+
+2. **Real-Time Collaboration Sync**
+   - Key capabilities: sub-500ms propagation of changes, CRDT/OT-based merge, concurrent conflict resolution (last-writer-wins on same range)
+   - User roles involved: all concurrent editors
+
+3. **Presence Indicators**
+   - Key capabilities: live cursor positions with colored labels, viewer/editor distinction
+   - User roles involved: all document participants
+
+4. **Offline Editing & Sync**
+   - Key capabilities: local edit queue while disconnected, merge on reconnect, conflict resolution post-reconnect
+   - User roles involved: editors
+
+5. **Version History**
+   - Key capabilities: automatic snapshots every 5 min of activity, named manual snapshots, restore (implied), browsable history
+   - User roles involved: editors, admins
+
+6. **Comments & Suggestions (Track Changes)**
+   - Key capabilities: inline comments on selections, suggestion mode, comment threads (implied), resolve/accept/reject suggestions
+   - User roles involved: commenters, editors
+
+7. **Document Permissions**
+   - Key capabilities: view-only / can-comment / can-edit tiers per user per document, integration with existing permissions model
+   - User roles involved: admins, document owners
+
+8. **Document Templates**
+   - Key capabilities: admin-created templates, pre-populated structure and placeholder content, instantiation on new document creation
+   - User roles involved: admins, editors
+
+9. **Export**
+   - Key capabilities: PDF, DOCX, Markdown output formats
+   - User roles involved: all users with at least view access
+
+---
+
+## User Roles / Personas
+
+| Role | Description | Key needs |
+|------|-------------|-----------|
+| **Viewer** | Read-only access to a document | See current content, see presence indicators of others, export |
+| **Commenter** | Can read and annotate | Add/resolve inline comments, view suggestions |
+| **Editor** | Full edit access | Real-time typing, offline editing, accept/reject suggestions |
+| **Admin** | Manages workspace and documents | Create templates, manage permissions, view all version history |
+| **Document Owner** | Creator or designated owner | Grant/revoke per-user permissions, create named versions |
+
+---
+
+## Ambiguities & Missing Context
+
+1. **CRDT vs. OT library choice** — Determines latency model, server architecture, and offline merge correctness. No decision made. The two approaches have different consistency guarantees, especially for offline scenarios. *(Open question acknowledged by team)*
+
+2. **WebSocket infrastructure** — Whether to reuse existing infrastructure or introduce a dedicated WebSocket server affects deployment complexity, cost, and latency. *(Open question acknowledged)*
+
+3. **Image/file storage strategy** — "Inline base64 vs. file storage reference" is open. Has significant impact on document size limits, export fidelity, and storage costs. *(Open question acknowledged)*
+
+4. **Maximum document size** — Not specified. Directly impacts pagination strategy for version history, CRDT snapshot intervals, WebSocket payload sizes, and export timeouts. *(Open question acknowledged)*
+
+5. **Existing permissions model integration** — How the three document-level tiers (view/comment/edit) map to whatever roles already exist is unspecified. Risk of conflict or duplication. *(Open question acknowledged)*
+
+6. **Conflict resolution UX for last-writer-wins** — "Undo history preserved" is mentioned, but what does the user see when their edit is overwritten? No toast, modal, or visual indicator is described.
+
+7. **Comment threads vs. single comments** — "Inline comments" is mentioned, but threading (replies to comments), @mentions, and notification behavior are not specified.
+
+8. **Suggestion mode behavior** — Accept/reject by whom? Only the document owner? Any editor? Are suggestions tracked per-user with attribution?
+
+9. **Offline conflict scope** — What happens when two users edit the same paragraph offline and both reconnect? Last-writer-wins is defined for real-time, but the offline merge strategy for this case is unspecified.
+
+10. **Version history retention policy** — How long are automatic snapshots kept? Is there a cap on snapshot count? What triggers deletion?
+
+11. **Template instantiation scope** — Are templates global (workspace-wide) or per-project? Can non-admins see which templates exist?
+
+12. **Export permissions** — Can viewers export? Can commenters export the raw content (not just their annotated view)?
+
+13. **Restore from version** — Version history mentions snapshots but doesn't state whether restore is supported, and if so, what happens to edits made after the restored snapshot.
+
+14. **Notification model** — Are there email/in-app notifications for comments, suggestions, or mention events? Not mentioned at all.
+
+15. **Document size and performance SLA beyond 500ms sync** — The 500ms sync SLA is specified. No SLA for initial load, export generation time, or version history retrieval is given.
+
+---
+
+## Gap Analysis
+
+| # | Input Gap | What Was Unclear | Resolution | Impact on Stories |
+|---|-----------|-----------------|------------|-------------------|
+| G-1 | CRDT vs. OT framework | No library or approach selected; two fundamentally different architectures | **Deferred:** requires architecture decision before sync stories can be scoped | Blocks real-time sync, offline merge, and conflict resolution stories |
+| G-2 | WebSocket infrastructure | Reuse existing vs. dedicated server — no decision | **Deferred:** requires infra/ops input | Affects all real-time sync stories; may require separate epic |
+| G-3 | Image/file storage | Base64 inline vs. storage reference — open question | **Deferred:** requires platform/storage team input | Affects rich text editor (image support), export, and document size stories |
+| G-4 | Maximum document size | No size limit stated | **Assumed:** 5MB document content limit (reasonable for SaaS PM tools) pending stakeholder confirmation | Affects CRDT snapshot intervals, export timeouts, WebSocket payload sizing |
+| G-5 | Existing permissions model integration | How view/comment/edit tiers map to existing roles is unknown | **Deferred:** requires existing permissions model documentation | Blocks permissions story; may require discovery spike |
+| G-6 | Last-writer-wins UX | No UI described for when a user's edit is silently overwritten | **Assumed:** show a non-blocking toast "Your edit was merged with a concurrent change" with undo affordance | Affects conflict resolution story AC |
+| G-7 | Comment threading & @mentions | Only "inline comments" mentioned; threads, replies, mentions absent | **Asked:** Clarifier should surface this | Affects comments story scope significantly |
+| G-8 | Suggestion mode — accept/reject permissions | Who can accept/reject suggestions is unspecified | **Assumed:** any editor can accept/reject; owner can bulk-accept | Affects suggestions story AC |
+| G-9 | Offline conflict resolution (same range, both offline) | Last-writer-wins defined for real-time only; offline scenario silent | **Asked:** Clarifier should surface this | Affects offline sync story; may require different merge semantics |
+| G-10 | Version history retention | No retention policy or snapshot count cap | **Assumed:** retain last 100 auto-snapshots, unlimited named versions, 90-day purge for auto-snapshots | Affects version history story AC and storage planning |
+| G-11 | Template scope (global vs. per-project) | Not specified whether templates are workspace-wide or project-scoped | **Asked:** Clarifier should surface this | Affects templates story and admin UX |
+| G-12 | Export permissions | Whether viewers can export is not stated | **Assumed:** viewers and above can export; export reflects their permission tier (e.g., suggestions hidden for viewers) | Affects export story AC |
+| G-13 | Restore from version | Version history described; restore capability not confirmed | **Assumed:** restore is in scope; creates a new "restored from vX" version entry rather than destructive overwrite | Affects version history story scope |
+| G-14 | Notification model | No mention of notifications for comments, mentions, or suggestions | **Deferred:** notifications are typically a separate system; flagged as out-of-scope for this epic unless confirmed | May spawn a separate notifications epic |
+| G-15 | Performance SLAs beyond sync | Only 500ms sync SLA given; load, export, history retrieval unspecified | **Assumed:** initial load <2s for docs ≤5MB; export <30s; history list <1s | Affects AC for sync, export, and version history stories |
+
+**Unresolved gaps (Deferred/Asked):** 8 (G-1, G-2, G-3, G-5, G-7, G-9, G-11, G-14)
+**Resolved by assumption:** 7 (G-4, G-6, G-8, G-10, G-12, G-13, G-15) — all assumptions MUST be validated by stakeholder before sprint commitment.
+
+---
+
+## Technical Considerations
+
+- **CRDT vs. OT is the most consequential decision in this feature.** Yjs (CRDT) is the dominant open-source choice and handles offline merges naturally. Automerge is an alternative. Both require a server-side awareness/persistence layer. OT (e.g., ShareDB) requires a centralized transform server and is harder to extend offline. This decision gates multiple epics.
+- **WebSocket connection management at scale:** Presence indicators + real-time sync require persistent connections per active editor. If the existing app uses HTTP-only infrastructure, a new WebSocket gateway is likely needed. Consider connection multiplexing if the PM tool has many concurrent documents.
+- **Offline sync introduces a local persistence requirement:** The client must durably queue edits (IndexedDB or similar) to survive tab closure while offline. Service worker strategy should be considered.
+- **Version snapshot storage:** Automatic snapshots every 5 minutes per active document can accumulate rapidly. A differential/incremental snapshot format (storing CRDT ops, not full document copies) is strongly recommended.
+- **Export pipeline:** DOCX and PDF generation from a rich CRDT document state is non-trivial. Pandoc or a headless browser (Puppeteer) approach may be needed. Export of large documents could be slow — async job with polling or webhook is safer than synchronous HTTP.
+- **Permissions enforcement must be server-side:** Client-side permission checks are not sufficient. Every WebSocket op and REST endpoint must validate the caller's document tier.
+- **Image storage choice affects CDN strategy:** If images are stored as references to a file store, CDN cache invalidation and signed URL expiry must be handled. Base64 inline is simpler but bloats document size and breaks the 5MB assumption at scale.
+
+---
+
+## Suggested Feature Decomposition
+
+**Epic 1 — Foundation (prerequisite for everything)**
+- Architecture decision spike: CRDT vs. OT, WebSocket infra (1 spike story)
+- Storage decision spike: image/file handling (1 spike story)
+- Permissions model integration discovery (1 spike story)
+
+**Epic 2 — Core Editor (MVP)**
+- Rich text editor embed (headings, bold/italic/underline, lists, code blocks)
+- Tables and images (depends on storage decision)
+- Links
+
+**Epic 3 — Real-Time Collaboration**
+- WebSocket sync layer
+- Conflict resolution (last-writer-wins + UX feedback)
+- Presence indicators (cursors, names, colors)
+
+**Epic 4 — Offline Support**
+- Local edit queue (IndexedDB)
+- Reconnect merge
+- Offline conflict resolution (pending G-9 resolution)
+
+**Epic 5 — Version History**
+- Automatic snapshots
+- Manual named versions
+- Version browser UI
+- Restore (if confirmed in scope)
+
+**Epic 6 — Comments & Suggestions**
+- Inline comments (depends on G-7 resolution for threading scope)
+- Suggestion/track-changes mode
+- Accept/reject flow
+
+**Epic 7 — Permissions**
+- Per-user per-document tier assignment (view/comment/edit)
+- Server-side enforcement across all endpoints
+
+**Epic 8 — Templates**
+- Admin template creation (depends on G-11 resolution for scope)
+- Template instantiation on new document
+
+**Epic 9 — Export**
+- PDF export
+- DOCX export
+- Markdown export
+- Async export job pattern (if needed for large docs)
+
+**Priority order:** Epic 1 → Epic 2 → Epic 3 → Epic 7 → Epic 6 → Epic 4 → Epic 5 → Epic 8 → Epic 9
+
+## Stakeholder Clarifications
+
+# Stakeholder Responses
+
+## Critical Questions
+
+### 1. Which sync architecture: CRDT or OT?
+**Answer:** Go with Yjs. We evaluated all three options last quarter when the team was prototyping and Yjs won on ecosystem maturity and offline story. Automerge felt too academic and ShareDB requires a transform server we'd have to operate. Yjs it is.
+**Additional context:** Our mobile team already has a Yjs proof-of-concept sitting in a branch from that prototype — reach out to @sarah on the mobile team, she may be able to hand off the bindings work and save you a sprint.
+
+### 2. Can real-time sync reuse your existing infrastructure, or does it need a dedicated WebSocket gateway?
+**Answer:** Dedicated WebSocket server. Our backend is pure REST — no persistent connections anywhere. We'll need a new service. The infra team has already flagged this and said they can support a Node.js service alongside our existing stack. Don't try to bolt WebSockets onto the Rails API.
+**Additional context:** We have a rough budget approved for this service. Infra will provision it in the staging environment once you have an architecture doc — loop in @marcos before you write the infra spike.
+
+### 3. How do the three document tiers map onto your existing permissions model?
+**Answer:** Document-level tiers are fully independent and overlay on top of existing roles, and document permissions always win — they are the more restrictive. A workspace Admin who is explicitly set to View-only on a document cannot edit it. Document Owner is the person who created the document; they always retain Edit rights and can promote themselves if they accidentally restrict themselves.
+**Additional context:** We have a permissions audit coming up in Q3. Whatever you build here needs to be auditable — we'll need a log of every permission change on a document (who changed what, when).
+
+### 4. How are embedded images stored?
+**Answer:** File storage references. We already use S3 for file attachments elsewhere in the app — use the same bucket with the same signed URL pattern. Do not use base64. Our documents will have screenshots and diagrams and base64 would blow up document size immediately.
+
+### 5. When two users edit the same character range while both offline and then reconnect, what should happen?
+**Answer:** Last-reconnect-wins, but show a non-blocking notification to the user whose change lost. Something like "A concurrent offline edit was applied to this section — your change was overwritten." with an Undo button. We don't want a conflict resolution UI that blocks people; just make it transparent and recoverable.
+**Additional context:** This scenario will be rare in practice — most of our users are not heavy offline editors. Don't over-engineer it. The toast + undo is enough for launch.
+
+---
+
+## Important Questions
+
+### 1. Do inline comments support threaded replies and @mentions?
+**Answer:** Threaded replies yes, one level of nesting is fine. @mentions yes — this is a must-have because our users will use comments to loop in colleagues for review. Resolved/unresolved state is in scope too.
+
+### 2. Who can accept or reject suggestions in suggestion/track-changes mode?
+**Answer:** Any Editor can accept or reject suggestions. We considered restricting to Document Owner but it slows down review workflows. The Document Owner can bulk-accept all pending suggestions. Commenters cannot accept or reject — view only on suggestions.
+
+### 3. Are document templates workspace-wide or scoped to individual projects?
+**Answer:** Workspace-wide. We don't have strong project isolation needs right now and a global template library is simpler to manage. Any workspace admin can create, edit, or archive templates. All users with at least Edit access see the template picker on new document creation.
+
+### 4. Are notifications in scope for this epic?
+**Answer:** Emit events only. We have a notifications system already and the team that owns it will pick up the delivery side. Just publish the events (comment added, suggestion made, @mention, document shared) to the existing event bus and we'll wire up delivery separately.
+
+### 5. What is the version history retention policy?
+**Answer:** Keep the last 100 auto-snapshots per document and purge anything older than 90 days. Named manual versions are kept forever — users who take the time to name a version expect it to stick around. Make sure the version browser makes it visually obvious which entries are manual vs. auto.
+
+---
+
+## Nice to Have
+
+### 1. What should the user see when their real-time edit is overwritten by last-writer-wins?
+**Answer:** Non-blocking toast with an Undo action, auto-dismiss after 5 seconds. Keep it short — "Your edit was merged with a concurrent change." Don't use the word "overwritten" — users will panic.
+
+### 2. Can Viewer-tier users export the document?
+**Answer:** Yes. Any user with at least Viewer access can export. But Viewers should only see the clean document — no unresolved comments, no suggestions markup. Export reflects their permission tier.
+
+### 3. Is "restore from version" in scope?
+**Answer:** Yes, and it must be non-destructive. Restore creates a new head version ("Restored from v12 — [timestamp]") so nothing is lost. We had a bad experience with a destructive restore in our old wiki tool and users were furious. Never overwrite.
+
+### 4. Performance SLAs?
+**Answer:** Initial document load under 2 seconds for anything up to 5MB. Export is async — fire the job, poll for completion, 30 seconds is acceptable. Version history list should load in under a second for up to 500 entries.
+
+### 5. Maximum document size?
+**Answer:** 5MB of document content, not counting externally stored images. That covers even the largest specs and RFCs our teams write. If someone needs something bigger, they should be splitting the document.
+
+---
+
+## Assumptions Review
+
+| # | Assumption | Verdict | Notes |
+|---|-----------|---------|-------|
+| 1 | Restore from version creates a new version entry rather than destructive overwrite | ✅ Correct | Confirmed — non-destructive is a hard requirement, see my answer above. |
+| 2 | Export reflects the caller's permission tier | ✅ Correct | Viewer exports get the clean doc, no suggestions or unresolved comments. |
+| 3 | Presence indicators are ephemeral (not persisted) | ✅ Correct | Cursor positions are live only. Don't store them. |
+| 4 | Automatic snapshots use incremental CRDT ops, not full document copies | ⚠️ Partially | Incremental is preferred for storage efficiency, but we need at least one full snapshot per session start (not just deltas) so that version restore doesn't require replaying the entire op log from the beginning of time. Talk to the team about a hybrid approach. |
+| 5 | The export pipeline is asynchronous for documents over a threshold size | ❌ Wrong | Async for **all** exports, not just large ones. We want a consistent UX — "your export is ready, click to download" — regardless of size. Synchronous export for small docs creates inconsistent behavior that confuses users when a larger doc suddenly behaves differently. |

@@ -1,0 +1,82 @@
+# Clarifying Questions
+
+## Critical (must answer before proceeding)
+
+1. **SSO user migration strategy**
+   When an organization enables SSO enforcement, how are existing email/password users transitioned? Do they immediately lose password access, or is there a grace period?
+   - _Why it matters:_ Determines whether we need migration flows, grace period logic, and support procedures for locked-out users
+   - _Default assumption if unanswered:_ Immediate enforcement with email notification to users directing them to contact their org admin
+
+2. **MFA backup recovery escalation**
+   When users lose both their MFA device and recovery codes, what's the recovery process? Who can reset their MFA, and what verification is required?
+   - _Why it matters:_ Critical for support procedures and security policy; affects admin UI requirements
+   - _Default assumption if unanswered:_ Organization admins can reset user MFA after email confirmation, with audit log entry
+
+3. **Rate limiting thresholds**
+   What are the specific rate limits for authentication endpoints (attempts per minute/hour per IP and per user), and what are the progressive penalties?
+   - _Why it matters:_ Essential for preventing credential stuffing; affects user experience and infrastructure requirements
+   - _Default assumption if unanswered:_ 10 attempts per minute per IP, 5 per minute per user account, with 15-minute lockouts
+
+4. **Organization admin permission granularity**
+   Do organization admins have full control (SSO config, MFA policies, user management, audit access) or are there different admin role levels?
+   - _Why it matters:_ Determines UI complexity and security model; affects story scope significantly
+   - _Default assumption if unanswered:_ Single "Organization Admin" role with full authentication management permissions
+
+5. **Session timeout enforcement behavior**
+   When an organization changes their session timeout setting, does it apply to existing active sessions or only new logins?
+   - _Why it matters:_ Affects technical implementation complexity and user experience during policy changes
+   - _Default assumption if unanswered:_ New timeout applies only to sessions created after the setting change
+
+## Important (strongly recommended)
+
+1. **SSO provider self-service scope**
+   Can organization admins configure standard providers (Okta, Azure AD) themselves, or do all SSO integrations require support assistance?
+   - _Why it matters:_ Determines whether we need self-service configuration UI vs. admin-managed setup
+   - _Default assumption if unanswered:_ Self-service UI for Okta and Azure AD, support-assisted for custom SAML providers
+
+2. **SMS provider and international coverage**
+   Which SMS service should we use, and what international coverage is required? Are there cost controls needed?
+   - _Why it matters:_ Affects vendor selection, cost projection, and feature availability by region
+   - _Default assumption if unanswered:_ Twilio with US/Canada/EU coverage, $50/month cost cap per organization
+
+3. **Audit log retention and access control**
+   How long should authentication logs be retained, and who can access them (org admins, security team, both)?
+   - _Why it matters:_ Storage cost planning and compliance requirements; affects access control implementation
+   - _Default assumption if unanswered:_ 90-day retention, accessible by organization admins and internal security team
+
+4. **MFA policy inheritance**
+   When organization admins enforce MFA for all users, can individual users still choose their MFA method (TOTP vs SMS), or does the admin set the method?
+   - _Why it matters:_ Determines policy enforcement complexity and user choice preservation
+   - _Default assumption if unanswered:_ Users choose their method; admins only enforce "MFA required" flag
+
+5. **SSO provider failover behavior**
+   If the configured SSO provider is unavailable, should users fall back to password auth or see an error message?
+   - _Why it matters:_ Affects reliability during provider outages; security vs. availability trade-off
+   - _Default assumption if unanswered:_ No fallback to password for SSO-enforced orgs; users see provider unavailable message
+
+## Nice to Have (will use reasonable defaults)
+
+1. **Recovery code format and quantity**
+   How many backup codes should be generated, and what format (length, character set)?
+   - _Why it matters:_ Balance between security and usability
+   - _Default assumption if unanswered:_ 10 codes, 8-digit alphanumeric
+
+2. **SSO flow branding**
+   Should the SSO login flow display customer organization branding, or use our platform's standard styling?
+   - _Why it matters:_ User experience and enterprise customer satisfaction
+   - _Default assumption if unanswered:_ Standard platform branding with organization name
+
+3. **Authentication error message specificity**
+   How specific should error messages be (e.g., "user not found" vs. "invalid credentials")?
+   - _Why it matters:_ Security vs. usability trade-off for user enumeration attacks
+   - _Default assumption if unanswered:_ Generic "invalid credentials" messages to prevent user enumeration
+
+## Assumptions Being Made
+
+_These are interpretations the analysis has already made. Flag any that are wrong._
+
+1. **Email-based account linking** — SSO users will be matched to existing accounts via email address — Based on standard SSO practice, but may not work for orgs with different email domains
+2. **Organization-level SSO configuration** — Each organization can only have one SSO provider configured — Standard enterprise pattern, but some large orgs have multiple providers
+3. **MFA device per-user** — Users manage their own MFA devices; admins don't provision centrally — Consumer-style enrollment vs. enterprise device management
+4. **JWT token continuity** — Current JWT structure can be extended for SSO assertions — May need significant token payload changes for SSO claims
+5. **Phase-based delivery** — Features can be delivered incrementally without breaking existing functionality — Assumes current auth system can coexist with new features

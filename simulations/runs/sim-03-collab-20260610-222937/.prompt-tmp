@@ -1,0 +1,173 @@
+# Agent Definition
+
+# Agent: Clarifier
+
+## Role
+You are a senior business analyst who specializes in surfacing the right questions before work begins. You read the output of the Story Analyst and distill the ambiguities, assumptions, and missing context into a prioritized list of concrete questions that a product owner or stakeholder can answer quickly.
+
+## When used
+- **Generate mode, Step 2 (Clarify):** After initial analysis, before story decomposition.
+- **Refine mode:** Not currently used (gap analysis serves a similar role).
+
+## Inputs
+- Analysis output from the Story Analyst (Generate mode format)
+- Original user input (for reference)
+
+## Output
+
+```markdown
+# Clarifying Questions
+
+## Critical (must answer before proceeding)
+1. **[Short question title]**
+   [Full question with enough context that the reader doesn't need to re-read the analysis]
+   - _Why it matters:_ [Impact on story decomposition if left unanswered]
+   - _Default assumption if unanswered:_ [What the pipeline will assume]
+
+2. ...
+
+## Important (strongly recommended)
+1. ...
+
+## Nice to Have (will use reasonable defaults)
+1. ...
+
+## Assumptions Being Made
+_These are interpretations the analysis has already made. Flag any that are wrong._
+1. [Assumption] — [Basis for it]
+2. ...
+```
+
+## Rules
+1. **Be concrete.** "What about error handling?" is useless. "When SSO assertion fails mid-login, should the user see a generic error or a provider-specific diagnostic with retry?" is actionable.
+2. **Limit scope.** Ask only questions whose answers would change the stories. Don't ask about implementation details that belong in sprint planning.
+3. **Provide defaults.** Every question should include what the pipeline will assume if the stakeholder doesn't answer. This lets partial responses still unblock progress.
+4. **Group by impact.** Critical = stories will be wrong without this. Important = stories will be weaker. Nice to Have = minor quality improvement.
+5. **Cap the list.** No more than 5 Critical, 5 Important, 5 Nice to Have. If you have more, merge or prioritize harder.
+6. **Surface hidden assumptions.** The analysis may have silently resolved ambiguities. Call those out in the Assumptions section so the stakeholder can correct them.
+
+# Task
+Review the analysis below and produce your prioritized list of clarifying questions. Include default assumptions for each question so the pipeline can proceed even with partial answers.
+IMPORTANT: Output the actual clarifying questions document directly. Do NOT describe what you would do — produce the deliverable itself.
+
+# Input
+
+## Analysis
+
+# Input Analysis
+
+## Summary
+A real-time collaborative document editor to be embedded within an existing project management tool, providing Google Docs-style editing with rich text formatting, simultaneous multi-user editing, and advanced features like version history and commenting.
+
+## Identified Features
+1. **Rich Text Editor** — Core WYSIWYG editing with formatting toolbar
+   - Key capabilities: headings, text styles, lists, code blocks, tables, images, links
+   - User roles involved: all document editors
+
+2. **Real-Time Synchronization** — Live change propagation across connected clients
+   - Key capabilities: sub-500ms update delivery, cursor broadcasting, selection sharing
+   - User roles involved: all active editors
+
+3. **Presence & Awareness** — Visual indicators of who's currently editing
+   - Key capabilities: colored cursors, name labels, active user list
+   - User roles involved: all document viewers and editors
+
+4. **Conflict Resolution** — Automatic merging of concurrent edits
+   - Key capabilities: CRDT/OT implementation, last-writer-wins fallback, undo preservation
+   - User roles involved: editors making concurrent changes
+
+5. **Offline Editing** — Disconnect tolerance with sync on reconnect
+   - Key capabilities: local storage, change queuing, merge on reconnection
+   - User roles involved: mobile users, unstable connections
+
+6. **Version History** — Automatic and manual document snapshots
+   - Key capabilities: 5-minute auto-saves, manual versioning, named versions
+   - User roles involved: editors needing to revert changes
+
+7. **Comments & Suggestions** — Inline feedback and track-changes workflow
+   - Key capabilities: text selection comments, suggestion mode, review workflow
+   - User roles involved: reviewers, collaborators in approval processes
+
+8. **Granular Permissions** — Document-level access control
+   - Key capabilities: view-only, comment-only, edit permissions per user
+   - User roles involved: document owners, admins, external stakeholders
+
+9. **Document Templates** — Pre-structured document creation
+   - Key capabilities: admin template creation, placeholder content, structure preservation
+   - User roles involved: admins creating templates, users instantiating documents
+
+10. **Multi-Format Export** — Document portability
+    - Key capabilities: PDF, DOCX, Markdown generation with formatting preservation
+    - User roles involved: users sharing outside the platform
+
+## User Roles / Personas
+| Role | Description | Key needs |
+|------|-------------|-----------|
+| Document Editor | Primary content creator/modifier | Fast, intuitive editing; reliable sync; undo/redo |
+| Document Viewer | Read-only consumer | Clear formatting; fast load; export options |
+| Reviewer/Commenter | Provides feedback without editing | Comment placement; suggestion workflow; notification of changes |
+| Document Owner | Controls access and structure | Permission management; version control; template creation |
+| Admin | Manages organizational templates/policies | Template creation; user permission oversight; export controls |
+| Project Manager | Uses docs within PM context | Integration with tasks/projects; team collaboration visibility |
+
+## Ambiguities & Missing Context
+1. **Performance scale** — "Multiple users" could mean 5 or 500 — Affects infrastructure choices — Suggest: specify max concurrent editors per document
+2. **Document size limits** — No mention of max chars/words/MB — Critical for performance planning — Suggest: define upper bounds (e.g., 50K words, 10MB with images)
+3. **Integration touchpoints** — How does this connect to existing PM features — Affects UI/UX design — Suggest: specify if docs link to tasks, projects, or stand alone
+4. **Image handling strategy** — Inline base64 vs file references mentioned but not decided — Major architecture impact — Suggest: default to file storage with image optimization
+5. **Existing permissions model** — How document permissions interact with PM tool roles — Could create conflicting access patterns — Suggest: map to existing role hierarchy
+6. **Error scenarios** — No mention of sync failure, server downtime, or corruption handling — Users will experience these edge cases — Suggest: define graceful degradation behavior
+7. **Mobile experience** — Rich editing on mobile devices has different UX constraints — Affects feature scope — Suggest: specify mobile editor capabilities vs desktop
+8. **Search and discovery** — How users find and organize collaborative documents — Affects information architecture — Suggest: define document browser/search within PM tool
+
+## Technical Considerations
+- **CRDT vs OT choice** impacts client complexity and server requirements
+- **WebSocket infrastructure** may require separate service or could use existing real-time PM notifications
+- **Database schema** needs to handle document structure, versions, and collaborative metadata
+- **Caching strategy** for document content vs real-time updates
+- **File storage integration** with existing PM tool asset management
+- **Authentication integration** with current user session management
+- **Performance monitoring** for sync latency and document load times
+
+## Suggested Feature Decomposition
+**Phase 1 (Foundation):** Rich text editor + basic permissions + export
+- Core editing experience without real-time features
+- Establishes document model and basic UI integration
+
+**Phase 2 (Collaboration):** Real-time sync + presence + conflict resolution  
+- Adds collaborative features with simplified conflict handling
+- Most technically complex phase
+
+**Phase 3 (Workflow):** Comments + suggestions + version history
+- Builds on stable collaboration foundation
+- Adds content review and approval workflows
+
+**Phase 4 (Scale & Polish):** Offline support + templates + advanced permissions
+- Performance optimization and enterprise features
+- Most dependent on usage patterns from earlier phases
+
+## Original Input
+
+# Feature: Real-Time Collaborative Document Editing
+
+## Overview
+We're building a collaborative document editor into our project management tool. Multiple users should be able to edit the same document simultaneously, see each other's cursors and selections, and have changes merge automatically without conflicts. Think Google Docs-style experience but embedded in our existing app.
+
+## Requirements
+- Rich text editing: headings, bold/italic/underline, bullet lists, numbered lists, code blocks, tables, images, links
+- Real-time sync: changes appear on other users' screens within 500ms
+- Presence indicators: show who else is viewing/editing the document, with colored cursors and name labels
+- Conflict resolution: concurrent edits to different parts of the document merge automatically; concurrent edits to the same character range use last-writer-wins with undo history preserved
+- Offline support: users can edit while disconnected; changes sync and merge when reconnected
+- Version history: automatic snapshots every 5 minutes of activity, plus manual "save version" with optional name
+- Comments and suggestions: inline comments on text selections, suggestion mode (track changes style)
+- Permissions: view-only, can-comment, can-edit per user per document
+- Document templates: admins can create templates that pre-populate structure and placeholder content
+- Export: PDF, DOCX, Markdown
+
+## Open Questions
+- What CRDT library or OT framework should we use?
+- Do we need a dedicated WebSocket server or can we use our existing infrastructure?
+- How do we handle documents with embedded content (images, files) — inline base64 or reference to file storage?
+- What's the maximum document size we need to support?
+- How does this interact with our existing permissions model?
